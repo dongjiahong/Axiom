@@ -1,5 +1,7 @@
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
-import type { MergeSuggestionDto, SourceDraftDto } from "@/server/dto/extraction";
+import type { SourceDraftDto } from "@/server/dto/extraction";
 
 const CREATED_BY_LABELS: Record<string, string> = {
   extraction: "抽取",
@@ -17,7 +19,9 @@ export function DraftList({ drafts }: { drafts: SourceDraftDto[] }) {
     <ul className="divide-y rounded-lg border">
       {drafts.map((draft) => (
         <li key={draft.id} className="flex flex-wrap items-center gap-2 px-4 py-3">
-          <span className="font-medium">{draft.name}</span>
+          <Link href={`/library/${draft.id}`} className="font-medium hover:underline">
+            {draft.name}
+          </Link>
           {draft.tags.map((tag) => (
             <Badge key={tag} variant="secondary">
               {tag}
@@ -33,26 +37,6 @@ export function DraftList({ drafts }: { drafts: SourceDraftDto[] }) {
               {draft.unmatchedExcerptCount} 处摘录未匹配
             </Badge>
           ) : null}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** 接受/忽略按钮依赖方法论库的接口，待其就绪后再接入。 */
-export function MergeSuggestionList({ suggestions }: { suggestions: MergeSuggestionDto[] }) {
-  return (
-    <ul className="divide-y rounded-lg border">
-      {suggestions.map((suggestion) => (
-        <li key={suggestion.id} className="space-y-1 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {suggestion.members.map((member) => (
-              <Badge key={member.id} variant="secondary">
-                {member.name}
-              </Badge>
-            ))}
-          </div>
-          <p className="text-muted-foreground text-sm">{suggestion.reason}</p>
         </li>
       ))}
     </ul>

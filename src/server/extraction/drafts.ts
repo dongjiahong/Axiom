@@ -18,7 +18,7 @@ type Transaction = Parameters<Parameters<AppDatabase["transaction"]>[0]>[0];
 export type DbHandle = AppDatabase | Transaction;
 
 /** 按名称查找或新建标签，返回标签 ID（与 names 顺序一致）。 */
-function ensureTagIds(handle: DbHandle, names: string[]): string[] {
+export function ensureTagIds(handle: DbHandle, names: string[]): string[] {
   return names.map((name) => {
     const existing = handle.select().from(tags).where(eq(tags.name, name)).get();
     if (existing) return existing.id;
@@ -31,7 +31,7 @@ function ensureTagIds(handle: DbHandle, names: string[]): string[] {
 export function insertDraft(
   handle: DbHandle,
   draft: {
-    sourceId: string;
+    sourceId: string | null;
     name: string;
     body: MethodologyBody;
     originChunkIds: string[];

@@ -42,7 +42,7 @@ export function formatIssuePath(path: readonly PropertyKey[]): string {
   }, "");
 }
 
-function describeIssue(issue: z.core.$ZodIssue): string {
+export function describeIssue(issue: z.core.$ZodIssue): string {
   switch (issue.code) {
     case "invalid_type": {
       const expected = TYPE_NAMES[issue.expected] ?? issue.expected;

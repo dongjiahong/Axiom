@@ -19,11 +19,18 @@ export type ApiErrorCode =
   | "llm_unavailable"
   | "internal_error";
 
+/** 逐条校验问题（如确认入库失败），path 为表单字段路径。 */
+export interface ApiIssue {
+  path: string;
+  message: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: ApiErrorCode,
     message: string,
+    readonly issues?: ApiIssue[],
   ) {
     super(message);
     this.name = "ApiError";
@@ -35,9 +42,10 @@ export function errorResponse(err: unknown): Response {
   let status = 500;
   let code: ApiErrorCode = "internal_error";
   let message = "服务器内部错误，请稍后重试";
+  let issues: ApiIssue[] | undefined;
 
   if (err instanceof ApiError) {
-    ({ status, code, message } = err);
+    ({ status, code, message, issues } = err);
   } else if (err instanceof LLMNotConfiguredError) {
     status = 409;
     code = "llm_not_configured";
@@ -54,7 +62,7 @@ export function errorResponse(err: unknown): Response {
     console.error("[api] 未处理的错误：", err instanceof Error ? err.message : err);
   }
 
-  return Response.json({ error: { code, message } }, { status });
+  return Response.json({ error: { code, message, ...(issues ? { issues } : {}) } }, { status });
 }
 
 /** 解析并校验 JSON 请求体；不合法时抛 400 invalid_input。 */

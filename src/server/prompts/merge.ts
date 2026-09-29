@@ -57,6 +57,8 @@ function fake(input: MergeInput): MergeOutput {
       }
     }
   }
+  // 手动新建的草稿可能没有标签，而输出 schema 要求至少 1 个建议标签。
+  if (merged.suggestedTags.length === 0) merged.suggestedTags.push("未分类");
   return merged;
 }
 

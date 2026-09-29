@@ -4,7 +4,7 @@
 
 - 路由文件顶部 `export const runtime = 'nodejs'`；`export const dynamic = 'force-dynamic'`。
 - 入参统一用 Zod 解析（`src/server/http.ts` 提供 `parseJson(req, schema)`）。
-- 错误响应：`{ error: { code: string, message: string } }`，`message` 为可直接展示的中文。
+- 错误响应：`{ error: { code: string, message: string, issues?: { path: string, message: string }[] } }`，`message` 为可直接展示的中文；`issues` 仅在逐条校验失败时出现（如确认入库），`path` 为表单字段路径（如 `steps[0].title`）。
 
 | 情况 | HTTP | code |
 | --- | --- | --- |
@@ -60,10 +60,10 @@ draft ──confirm──▶ confirmed ──unconfirm──▶ draft
   └──archive──▶ archived ◀──archive──┘      archived ──restore──▶ draft
 ```
 
-- confirm 前执行 `methodology-validate.ts`：名称非空；至少 1 条适用条件；至少 1 个非条件步骤；每步至少 1 个要点；条件步骤必须有 trigger；不通过返回 400 并列出所有问题。
+- confirm 前执行 `methodology-validate.ts`：名称非空；至少 1 条适用条件；至少 1 个非条件步骤；每步至少 1 个要点；条件步骤必须有 trigger；再加 `MethodologyBody` 严格校验（步骤标题、要点文本不能为空等）；不通过返回 400 并在 `error.issues` 中列出所有问题。
 - confirmed 状态下保存 → `version + 1`。
 - 合并/拆分只允许作用于 draft。
-- 合并（手动或接受建议）：`runTask(merge)` → 新 draft（createdBy='merge'），原 draft 归档（mergedIntoId 指向新 draft）。撤销合并 = 对原 draft 执行 restore，并归档合并结果。
+- 合并（手动或接受建议）：`runTask(merge)` → 新 draft（createdBy='merge'），原 draft 归档（mergedIntoId 指向新 draft）。撤销合并 = 对原 draft 执行 restore（只恢复被点的这个），并归档合并结果（仅当合并结果仍是 draft；已确认的不动），其他原 draft 保持归档。
 - 拆分：选中若干步骤 → 新 draft（复制名称加"（拆分）"、适用条件、反例、原则、概念，只含选中步骤；createdBy='split'）；原方法论移除这些步骤（至少保留 1 个非条件步骤，否则 400）。
 
 ### 2.3 练习生命周期
@@ -122,7 +122,7 @@ POST /api/practice ──▶ briefing ──start──▶ active ──(用户�
 | GET | `/api/methodologies` | 查询参数 `status, tagId, sourceId, q`；列表项含 name、status、tags、来源资料、步骤数、推断/未匹配摘录数量、version |
 | POST | `/api/methodologies` | 手动新建空白 draft（带 1 个空步骤骨架） |
 | GET | `/api/methodologies/[id]` | 完整 DTO（含 body、tags、originChunks 标题） |
-| PUT | `/api/methodologies/[id]` | `{ name, tags: string[], body }`；body 用 `MethodologyBody` 校验；新节点无 id 时由服务端补 id；新增标签名自动建标签 |
+| PUT | `/api/methodologies/[id]` | `{ name, tags: string[], body }`；body 与 `MethodologyBody` 同形，但节点 id 可省略（服务端补 id）、文本允许为空（保存宽松，编辑中的 draft 也能保存）；已确认的方法论保存前须通过确认校验（400），保存后 version+1；已归档的返回 409；新增标签名自动建标签 |
 | POST | `/api/methodologies/[id]/confirm` / `unconfirm` / `archive` / `restore` | 状态迁移 |
 | POST | `/api/methodologies/[id]/split` | `{ stepIds: string[] }` → 新 draft |
 | POST | `/api/methodologies/merge` | `{ ids: string[] (≥2, 均为 draft) }` → 新 draft |

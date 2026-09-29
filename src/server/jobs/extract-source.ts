@@ -10,8 +10,9 @@ import {
   type JobStage,
 } from "@/server/db/schema";
 import { clusterAll, type ClusterGroup } from "@/server/extraction/cluster";
-import { allTagNames, insertDraft, tagNamesByMethodology } from "@/server/extraction/drafts";
-import { aiToBody, bodyToAi, normalizeTagNames } from "@/server/extraction/mapping";
+import { allTagNames, insertDraft } from "@/server/extraction/drafts";
+import { aiToBody } from "@/server/extraction/mapping";
+import { mergeDrafts } from "@/server/extraction/merge-drafts";
 import { createMergeSuggestion } from "@/server/extraction/suggestions";
 import { runTask, type TaskContext } from "@/server/llm/run-task";
 import {
@@ -244,7 +245,7 @@ async function dedupe(ctx: JobContext, tasks: ExtractTasks): Promise<void> {
     const members = group.refs.map((ref) => byRef.get(ref)!);
     if (group.confidence === "high") {
       try {
-        await mergeGroup(ctx, tasks, taskCtx, members);
+        await mergeDrafts(database, members, tasks.merge, taskCtx);
         continue;
       } catch (err) {
         if (signal.aborted) throw err;
@@ -262,46 +263,5 @@ function suggest(database: AppDatabase, sourceId: string, members: MethodologyRo
     sourceId,
     methodologyIds: members.map((m) => m.id),
     reason,
-  });
-}
-
-async function mergeGroup(
-  ctx: JobContext,
-  tasks: ExtractTasks,
-  taskCtx: TaskContext,
-  members: MethodologyRow[],
-): Promise<void> {
-  const { database } = ctx;
-  const sourceId = ctx.job.payload.sourceId;
-  const ids = members.map((m) => m.id);
-  const tagsById = tagNamesByMethodology(database, ids);
-  const originChunkIds = [...new Set(members.flatMap((m) => m.originChunkIds))];
-  const haystacks = database
-    .select({ id: sourceChunks.id, text: sourceChunks.text })
-    .from(sourceChunks)
-    .where(inArray(sourceChunks.id, originChunkIds))
-    .all();
-
-  const merged = await tasks.merge(
-    { drafts: members.map((m) => bodyToAi(m.body, m.name, tagsById.get(m.id) ?? [])) },
-    taskCtx,
-  );
-
-  database.transaction((tx) => {
-    const newId = insertDraft(tx, {
-      sourceId,
-      name: merged.name,
-      body: aiToBody(merged, haystacks),
-      originChunkIds,
-      createdBy: "merge",
-      tagNames: normalizeTagNames([
-        ...merged.suggestedTags,
-        ...members.flatMap((m) => tagsById.get(m.id) ?? []),
-      ]),
-    });
-    tx.update(methodologies)
-      .set({ status: "archived", mergedIntoId: newId, updatedAt: Date.now() })
-      .where(inArray(methodologies.id, ids))
-      .run();
   });
 }

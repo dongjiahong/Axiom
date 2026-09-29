@@ -18,6 +18,7 @@ export interface SourceDraftDto {
 
 export interface MergeSuggestionDto {
   id: string;
+  sourceId: string;
   reason: string;
   members: { id: string; name: string }[];
 }

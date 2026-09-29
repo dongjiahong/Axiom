@@ -7,6 +7,7 @@ import {
   methodologies,
   sourceChunks,
   type ExtractionStatus,
+  type MergeSuggestionStatus,
 } from "@/server/db/schema";
 import { countBodyMarks, type MergeSuggestionDto, type SourceDraftDto } from "@/server/dto/extraction";
 import { toJobDto, type JobDto } from "@/server/dto/job";
@@ -119,31 +120,44 @@ export function listSourceDrafts(sourceId: string, database: AppDatabase = db): 
   }));
 }
 
-/** 待处理的合并建议；成员已不全是 draft 的建议视为过期，不展示。 */
+/**
+ * 合并建议列表（默认只取待处理的）；sourceId 省略时不限资料。
+ * 待处理的建议若成员已不全是 draft 则视为过期，不展示。
+ */
 export function listMergeSuggestions(
-  sourceId: string,
+  sourceId?: string,
   database: AppDatabase = db,
+  status: MergeSuggestionStatus = "open",
 ): MergeSuggestionDto[] {
   const rows = database
     .select()
     .from(mergeSuggestions)
-    .where(and(eq(mergeSuggestions.sourceId, sourceId), eq(mergeSuggestions.status, "open")))
+    .where(
+      and(
+        eq(mergeSuggestions.status, status),
+        sourceId ? eq(mergeSuggestions.sourceId, sourceId) : undefined,
+      ),
+    )
     .orderBy(desc(mergeSuggestions.createdAt))
     .all();
+  const memberIds = [...new Set(rows.flatMap((row) => row.methodologyIds))];
   const members = new Map(
-    database
-      .select({ id: methodologies.id, name: methodologies.name, status: methodologies.status })
-      .from(methodologies)
-      .where(eq(methodologies.sourceId, sourceId))
-      .all()
-      .map((row) => [row.id, row]),
+    (memberIds.length === 0
+      ? []
+      : database
+          .select({ id: methodologies.id, name: methodologies.name, status: methodologies.status })
+          .from(methodologies)
+          .where(inArray(methodologies.id, memberIds))
+          .all()
+    ).map((row) => [row.id, row]),
   );
   return rows.flatMap((row) => {
     const resolved = row.methodologyIds.map((id) => members.get(id));
-    if (resolved.some((m) => !m || m.status !== "draft")) return [];
+    if (resolved.some((m) => !m || (status === "open" && m.status !== "draft"))) return [];
     return [
       {
         id: row.id,
+        sourceId: row.sourceId,
         reason: row.reason,
         members: resolved.map((m) => ({ id: m!.id, name: m!.name })),
       },

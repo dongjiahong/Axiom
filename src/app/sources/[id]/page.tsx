@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 
 import { ChunkTable } from "@/components/sources/chunk-table";
-import { DraftList, MergeSuggestionList } from "@/components/sources/draft-list";
+import { DraftList } from "@/components/sources/draft-list";
+import { MergeSuggestionList } from "@/components/sources/merge-suggestion-list";
 import { ExtractionPanel } from "@/components/sources/extraction-panel";
 import {
   FORMAT_LABELS,

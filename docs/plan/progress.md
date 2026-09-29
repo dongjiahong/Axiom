@@ -233,3 +233,64 @@ pnpm build                    # 通过
 - `extract_source` 处理器的三个 AI 调用经 `ExtractTasks`（`extractChunk` / `cluster` / `merge`）注入，默认走 `runTask`，测试可替换为桩。
 - `POST /api/sources/[id]/extract` 与 `GET /api/jobs/[id]` 返回 `JobDto`：`{ id, sourceId, status, stage, progressDone, progressTotal, error }`（比 `api-and-ui.md` 列出的字段多 `id`、`sourceId`）。`POST /extract` 在资料没有可抽取的章节块（全部已跳过）时返回 400，未配置模型且非 Fake 模式时返回 409（`llm_not_configured`）。
 - 「重试失败章节」与「开始抽取」共用 `POST /extract`（处理器本来就处理 pending 与 failed 两类块）。
+
+## WP5 · 方法论库与审阅
+
+### 完成内容
+
+1. **服务层**
+   - `services/methodologies.ts`：`listMethodologies`（按 `status / tagId / sourceId / q` 筛选）、`getMethodology`、`createBlankMethodology`（手动新建 draft，带 1 个空步骤 + 1 个空要点）、`saveMethodology`、`changeMethodologyStatus`（confirm / unconfirm / archive / restore）、`splitMethodology`、`mergeMethodologies`、`acceptMergeSuggestion`、`dismissMergeSuggestion`。
+   - `services/tags.ts`：`listTags`（含未归档方法论的使用数量）、`setMethodologyTags`（整体替换，不存在的标签自动创建）。
+   - `extraction/merge-drafts.ts`：`mergeDrafts`，把一组 draft 合并为新 draft（摘录在来源章节块并集中重新核对，标签与 `originChunkIds` 取并集，原 draft 归档并写 `mergedIntoId`）。**抽取流水线的高置信自动合并（`extract-source.ts`）改为调用它**，与手动合并、接受建议共用一份逻辑。合并期间成员被改动（不再是 draft 或 `updatedAt` 变化）时放弃合并并返回 409。
+   - `dto/methodology.ts`：列表项 / 详情 DTO（详情含 `originChunks`：`{ id, sourceId, title }`，供原文抽屉取正文）与保存、拆分、合并的入参 schema。
+2. **规则**
+   - 状态迁移：draft→confirmed（confirm）、confirmed→draft（unconfirm）、draft/confirmed→archived（archive）、archived→draft（restore），其他一律 409。
+   - 确认校验 `collectConfirmIssues`：`validateMethodologyForConfirm` 的业务规则 + `MethodologyBody` 严格校验（步骤标题、要点文本不能为空等），同一路径只报一次；失败返回 400，全部问题在 `error.issues`。
+   - 保存：宽松入参（节点 id 可省略、文本可为空）；新节点及重复 id 由服务端补 nanoid，已存在 id 不变；概念的 `relatedStepIds` 只保留仍存在的步骤；confirmed 保存前必须通过确认校验，保存后 `version + 1`；archived 保存返回 409。
+   - 拆分：只允许 draft；新 draft 名称加“（拆分）”，复制适用条件、反例、原则、概念、标签、`sourceId`、`originChunkIds`，所有节点换新 id，概念的关联步骤随之映射；原方法论移除所选步骤并清理概念关联；拆完原方法论没有非条件步骤则 400。
+   - 撤销合并：restore 一个因合并而归档的原 draft 时，只恢复被点的这个，清空 `mergedIntoId`；合并结果仍是 draft 才归档，已确认的不动；其他原 draft 保持归档。
+   - 合并建议：accept 要求建议为 open 且成员全部仍是 draft，否则 409（含成员已被删除）；成功后标记 `accepted`。dismiss 标记 `dismissed`。
+3. **接口**：`GET/POST /api/methodologies`、`GET/PUT /api/methodologies/[id]`、`POST /api/methodologies/[id]/{confirm,unconfirm,archive,restore,split}`、`POST /api/methodologies/merge`、`GET /api/merge-suggestions`（`?sourceId&status`）、`POST /api/merge-suggestions/[id]/{accept,dismiss}`、`GET /api/tags`。
+4. **页面**
+   - `/library`：候选 / 已确认 / 已归档三个页签（带数量，默认“已确认”），按标签、资料、名称筛选（URL 参数驱动），列表项显示标签、来源、步骤数、“N 处 AI 推断”“N 处摘录未匹配”；候选页签可多选合并；选中 2 个可跳到对比页；空状态引导去导入资料。
+   - `/library/[id]`：react-hook-form + useFieldArray 编辑器——名称、可新建标签、概要 / 目标、适用条件、反例、顺序模式、步骤（上移 / 下移、条件步骤 + 触发条件、要点、示例话术、常见错误）、原则、概念（关联步骤多选）；节点旁的核对徽章（原文已核对 / 近似匹配 / 未在原文中找到 / AI 推断），点击打开右侧原文抽屉并高亮、滚动到摘录位置；拆分模式（步骤复选框）；确认失败时在顶部列出全部问题，点击定位到字段；有未保存修改时刷新 / 关闭页面或点击站内链接会提示；归档状态只读。
+   - `/library/compare?a=&b=`：两列并排对比。
+   - 资料详情页：候选方法论名称链接到编辑页；合并建议增加“接受合并 / 忽略”按钮（`components/sources/merge-suggestion-list.tsx`）。
+5. **测试**：`tests/server/methodologies.test.ts`（36 个用例）覆盖：合法与非法状态迁移（409）、确认失败 400 且列出全部问题、confirmed 保存 version+1 / draft 不变、新节点补 id 且已有 id 不变、重复 id 重新分配、标签自动创建与替换、空白骨架可保存但不能确认、confirmed 保存校验失败不改动、archived 保存 409、拆分（划分、概念映射、拒绝留不下非条件步骤、非 draft）、合并（归档与 `mergedIntoId`、restore 撤销、已确认合并结果不被归档、摘录在块并集中重新核对、跨资料 `sourceId` 为空、参数 / 状态校验、合并期间被改动 409、AI 失败不改动）、合并建议（接受 / 忽略 / 过期 / 重复处理）、列表筛选与标签计数。删除资料时 draft 删除、confirmed 保留且 `sourceId` 置空的用例已由 WP3 的 `tests/server/sources.test.ts` 覆盖。
+
+### 验证方式
+
+```
+pnpm lint         # 通过，无告警
+pnpm typecheck    # 通过
+pnpm test         # 22 个文件 / 224 个用例通过（新增 1 个文件 / 36 个用例）
+pnpm build        # 通过
+```
+
+另用 `AXIOM_FAKE_LLM=1` + 独立 `AXIOM_DATA_DIR` 启动 `next start`，先 `db:seed`，手工走通：
+- API：列表 / 详情 / 标签；确认种子 draft；对空白 draft 确认返回 400 与 `issues`；非法迁移返回 409；手动合并两个 draft 得到 `createdBy=merge` 的新 draft，原 draft 归档。
+- 浏览器（agent-browser）：打开编辑页 → 改名称、添加已有标签、下移步骤 → 保存，version 2、步骤顺序与标签生效，已有节点 id 不变；对空白 draft 点“确认入库”，顶部列出 3 个问题；上传夹具并 Fake 抽取后，点击“原文已核对”徽章，抽屉高亮了对应原文。
+
+### 已知限制
+
+- **未用真实模型验证合并任务的质量**：只在 Fake 模式和桩任务下验证；真实模型下合并结果（是否丢要点、摘录是否原样）需要人工检查。
+- 未在浏览器里逐项走通：拆分模式、合并建议的接受 / 忽略按钮、对比页、未保存修改的离开提示（这几处只有服务层测试 / 类型检查 / 构建保证）。
+- 示例话术、常见错误在编辑器里是“每行一条”的多行文本框，而不是逐条增删的列表；提交时会去掉空行。
+- 标签输入是“输入 + 回车 / 点击已有标签”，不是下拉多选框。
+- 版本号只在**保存已确认方法论**时 +1（按计划）。“退回候选 → 修改 → 再次确认”不会自动 +1，这条路径下快照 / 场景记录的 `version` 可能与内容不完全对应；如需严格对应，应在再次确认时也 +1（待你决定）。
+- 方法论没有删除接口（计划接口清单中没有），用“归档”代替。
+- 确认校验中来自 Zod 的问题文案形如 `steps[0].title：长度不能小于 1`，不如业务规则的文案友好。
+- WP4 遗留的“重新聚类时用户手工编辑过的 draft 也可能被自动合并”仍未处理；本包增加的合并期间变化检测只能兜住并发编辑，不能区分“用户是否编辑过”。
+- 手动新建、没有标签的 draft 在 Fake 模式合并时，Fake 合并任务会补一个“未分类”建议标签（真实模型不受影响）。
+
+### 对公共契约的改动
+
+均为向后兼容的补充，已同步 `docs/plan/api-and-ui.md`：
+
+- **错误响应**新增可选字段 `error.issues: { path, message }[]`（`ApiError` 新增可选的第 4 个构造参数 `issues`）；目前只有确认入库 / 已确认保存的校验失败会带。
+- **`PUT /api/methodologies/[id]`**：入参 body 与 `MethodologyBody` 同形，但节点 `id` 可省略、文本允许为空（原文写“用 `MethodologyBody` 校验”，而空白骨架与编辑中的 draft 无法通过严格校验；经确认改为“保存宽松、确认严格”）。已确认方法论保存前须通过确认校验（经确认）。
+- **确认校验**在 `validateMethodologyForConfirm` 之外叠加 `MethodologyBody` 严格校验（`validateMethodologyForConfirm` 本身未改）。
+- **撤销合并**的语义按上文明确（经确认）。
+- **`MergeSuggestionDto`** 增加 `sourceId`；`listMergeSuggestions(sourceId?, database?, status?)` 的 `sourceId` 改为可选并增加 `status` 参数，原有按资料查询的调用不受影响。
+- **WP4 代码的小改动**：`extract-source.ts` 的高置信合并改用共享的 `mergeDrafts`（行为不变，并新增“合并期间成员被改动则放弃”的检查，放弃时仍降级为合并建议）；`insertDraft` 的 `sourceId` 允许为 `null`；导出 `ensureTagIds`（`extraction/drafts.ts`）与 `describeIssue`（`prompts/common.ts`）；`merge` 任务的 `fake()` 在没有任何标签时补“未分类”（`promptVersion` 未变，输出 schema 未变）。
+- 新增 `GET /api/tags` 返回 `{ id, name, count }[]`，`count` 为使用该标签且未归档的方法论数量（原文“使用数量”未细化）。
