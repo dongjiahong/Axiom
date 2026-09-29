@@ -62,3 +62,10 @@ export const LLM_TRANSPORT_RETRIES = 3;
 
 /** JSON 输出不合规时的最大尝试次数（含首次）。 */
 export const LLM_JSON_ATTEMPTS = 3;
+
+/** llm_calls 中 requestMessages / responseText 的最大保留字符数（超出截断）。 */
+export const LLM_LOG_MAX_CHARS = 200000;
+
+/** 设置页允许的轮数上限范围（含端点）。 */
+export const MAX_TURNS_MIN = 4;
+export const MAX_TURNS_MAX = 30;

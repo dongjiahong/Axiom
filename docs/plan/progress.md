@@ -95,3 +95,49 @@ pnpm build                      # 通过，7 个页面预渲染成功
 - 新增补充类型 `CounterpartEnd` / `MessageMeta` / `ScoreBreakdown` / `DebriefSummary`，为 `data-model.md` 中已描述但其 JSON 结构未写成 Zod 的字段（`messages.meta`、`debriefs.scoreBreakdown`、`debriefs.summary`）提供类型。
 - `methodologies.version` 默认值 1、`practice_sessions.hintUsed` 默认 false、`verdicts.evidenceDowngraded` 默认 false，按表定义落为 SQL 默认值。
 - 迁移目录定为 `src/server/db/migrations`（对应 `README.md` 目录结构中的 `db/migrations`）。
+
+## WP2 · AI 层与设置页
+
+### 完成内容
+
+1. **`src/server/llm/errors.ts`**：`LLMNotConfiguredError`、`LLMOutputError`（带 `task` 与 `errors`）、`LLMUnavailableError`（带 `status`、已去除 Key 的 `detail`）、`LLMTruncatedError`（带已收到的 `text` 与 token 数）。
+2. **`src/server/llm/json.ts`**：`extractJson(text)` 返回 `{ ok, value } | { ok: false, error }`。流程：去 `<think>`/`<thinking>` 块（兼容只剩结尾标签的输出）→ 取第一个代码块 → 从第一个 `{` 起做字符串感知的括号配对 → `JSON.parse` → `jsonrepair` 兜底（未闭合的输出也交给它补全）。
+3. **`src/server/llm/settings.ts`**：读写 `settings.llm` / `settings.practice`；`AXIOM_LLM_BASE_URL / API_KEY / MODEL` 逐字段覆盖数据库值（空白字符串视为未设置）；`getLLMSettings()` 缺任一字段抛 `LLMNotConfiguredError`；`isLLMConfigured()`（Fake 模式视为已配置）；`maskApiKey()`（`sk-****abcd`）；保存时仅当 Base URL / 模型 / Key 有变化才清空能力探测结果。
+4. **`src/server/llm/client.ts`**：`OpenAICompatClient`，按 §2 发送 `temperature` / `response_format`，不发 `max_tokens`；`finish_reason=length` 抛 `LLMTruncatedError`；SDK 错误转为带中文提示的 `LLMUnavailableError`（401/403、404、429、超时、连接失败），信息中的 API Key 会被替换为 `****`；`signal` 已中止时原样抛出中止错误。
+5. **`src/server/llm/run-task.ts`**：`TaskDef`、`TaskName`、`runTask`。每次尝试写一条 `llm_calls`（`ok` / `invalid_output` / `transport_error`）；非法 JSON、schema 不符、语义校验失败、截断都带修正提示重试，最多 `LLM_JSON_ATTEMPTS` 次，之后抛 `LLMOutputError`；传输错误不重试；每次尝试前检查 `signal`，并透传给客户端；Fake 模式直接用 `def.fake()`，并断言其输出通过 schema 与 validate（不写 llm_calls）。
+6. **`src/server/llm/call-log.ts`**、**`fake.ts`**：`recordLLMCall`（请求/响应文本超过 `LLM_LOG_MAX_CHARS` 截断）；`isFakeLLM()`。
+7. **`src/server/prompts/common.ts`**：`outputFormatPrompt`、`correctionPrompt`、`zodErrorToMessages`（如 `keyPointVerdicts[3].quality：不能大于 5`）。
+8. **`src/server/http.ts`**：`ApiError`、`errorResponse`（AI 错误映射为 409 `llm_not_configured` / 502 `llm_invalid_output` / 502 `llm_unavailable`，未知错误 500 且不泄露细节）、`parseJson`、`route` 包装。
+9. **设置**：`src/server/dto/settings.ts`（API Key 只以掩码下发）、`src/server/services/settings.ts`（`getSettings` / `updateLLMSettings` / `updatePracticeSettings` / `testLLMConnection`）、路由 `GET /api/settings`、`PUT /api/settings/llm`、`POST /api/settings/llm/test`、`PUT /api/settings/practice`。测试连接按 §2 探测 temperature 与 JSON 模式，写回 `settings.llm`，并写入 `task='test'` 的 llm_calls。
+10. **设置页 `/settings`**（`components/common/settings-form.tsx`）：Base URL、API Key（密码框，显示掩码，留空不修改）、模型名、保存、测试连接（延迟、JSON 模式、temperature、示例回复）、轮数上限、数据目录与明文存 Key 的提示；被环境变量覆盖时显示提示。
+11. **首页横幅**：未配置 AI（且非 Fake 模式）时首页顶部显示引导去设置页的横幅。
+12. **测试**（`tests/server/`）：`json`（纯 JSON、代码块、前后文字、`<think>`、尾逗号/未闭合、完全非法）；`run-task`（非法 JSON → schema 不符 → 正确，断言第 2、3 次 messages 含修正提示、3 条 llm_calls；三次失败抛 `LLMOutputError`；语义校验重试；截断；传输错误不重试；signal 透传；未配置；Fake 模式）；`settings`（环境变量覆盖、GET 响应不含 Key、Key 留空不修改、探测结果清空、测试连接各分支、入参范围）；`client`（用注入的 `fetch` 断言请求体、错误转换与 Key 脱敏）；`http-common`（Zod 中文化、修正提示、错误映射）。
+
+### 验证方式
+
+```
+pnpm lint         # 通过
+pnpm typecheck    # 通过
+pnpm test         # 9 个文件 / 87 个用例通过
+pnpm build        # 通过，/api/settings* 与 /、/settings 均为动态路由
+```
+
+另用本地 mock 的 OpenAI 兼容端点 + `next dev` 手工走通：未配置时 `POST /llm/test` 返回 409；入参非法返回 400 中文提示；保存后 GET 只显示 `****3456`；测试连接在端点拒绝 `temperature` 时自动降级并记录 `supportsTemperature=false`、`supportsJsonMode=true`；首页横幅在配置前出现、配置后消失；dev 日志中不含 API Key。
+
+### 已知限制
+
+- **未用真实的 OpenAI 兼容端点验证**（验收条款里的“真实端点测试连接成功”）：本环境没有可用的 Key，只用了 mock 端点和注入 `fetch` 的单测。请在配置真实端点后点一次“测试连接”确认。
+- 设置页的“测试连接”会先保存表单再测试（接口读取的是已保存的设置）。
+- Fake 模式下“测试连接”直接返回成功的示例结果，不访问网络，也不写回探测结果。
+- 探测 JSON 模式时只有 HTTP 400 记为“不支持”；其他状态码（如某些端点返回 422）会作为连接失败抛出。
+- 各任务（`extract_chunk` 等）的 `TaskDef` 与提示词由后续工作包实现；本包只提供 `runTask` 框架，测试里用的是测试专用的 `TaskDef`。
+- 客户端网络错误的单测会等待 SDK 的退避重试（约 3 秒）。
+
+### 对公共契约的改动
+
+均为向后兼容的补充，已同步 `docs/plan/*`：
+
+- `LLMClient` 增加可选属性 `model?: string`，仅用于 llm_calls 的 `model` 列（省略时记为 `unknown`）。
+- `runTask` 的 `ctx` 增加可选的 `db`、`client`，仅供测试注入；生产代码不传。
+- `src/domain/constants.ts` 新增 `LLM_LOG_MAX_CHARS`（200000）、`MAX_TURNS_MIN`（4）、`MAX_TURNS_MAX`（30），并写入 `README.md` §6。
+- 新增 `src/server/llm/fake.ts`（`isFakeLLM`）与 `src/server/llm/call-log.ts`，位置与 `README.md` §4 的目录结构一致或为其补充。

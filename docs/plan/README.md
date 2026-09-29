@@ -163,6 +163,8 @@ src/server/jobs/*     ← 进程内任务队列（抽取）
 | `SELECTION_EPSILON` | 0.1 | 加权随机的基础权重，保证高掌握度也有机会被抽到 |
 | `MATCH_MIN_CHARS` / `FUZZY_THRESHOLD` | 4 / 0.7 | 文本核对阈值 |
 | `LLM_TIMEOUT_MS` / `LLM_TRANSPORT_RETRIES` / `LLM_JSON_ATTEMPTS` | 180000 / 3 / 3 | AI 调用 |
+| `LLM_LOG_MAX_CHARS` | 200000 | llm_calls 中请求/响应文本的最大保留字符数 |
+| `MAX_TURNS_MIN` / `MAX_TURNS_MAX` | 4 / 30 | 设置页轮数上限的允许范围 |
 
 ## 7. 工作包与依赖
 

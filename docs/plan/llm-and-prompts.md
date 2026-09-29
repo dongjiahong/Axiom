@@ -14,6 +14,7 @@
 export interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string }
 
 export interface LLMClient {
+  readonly model?: string;   // 仅用于 llm_calls 记录，桩客户端可省略
   complete(req: {
     messages: ChatMessage[];
     temperature: number;
@@ -59,7 +60,11 @@ export interface TaskDef<I, O> {
 export async function runTask<I, O>(
   def: TaskDef<I, O>,
   input: I,
-  ctx?: { refType?: string; refId?: string; signal?: AbortSignal },
+  ctx?: {
+    refType?: string; refId?: string; signal?: AbortSignal;
+    db?: AppDatabase;      // 仅测试注入：默认全局 db
+    client?: LLMClient;    // 仅测试注入：默认按设置构造 OpenAICompatClient
+  },
 ): Promise<O>;
 ```
 
