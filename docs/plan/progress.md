@@ -444,3 +444,61 @@ pnpm build        # 通过
 - `POST /api/sessions/[id]/debrief` 返回 `DebriefDto`（与 `GET` 相同）；已复盘再调用返回 409；练习未结束返回 409。`GET` 在未复盘时返回 404 `not_found`。
 - `DebriefDto` 的形状见 `src/server/dto/debrief.ts`。其中 `session` 复用 WP6 的 `SessionDto`（此时已揭晓）；`steps[].keyPoints[]` 与 `principles[]` 是 `VerdictDto`（含 AI 原始判定、降级标记、证据、示范改写、改判信息与生效判定/质量分）。
 - `debrief` 任务输入的 `scenario` 只含可见字段 + 角色卡（阻力只带 `id/trigger/reaction`）+ `designNotes`；`selected` 的要点引用 `k1..` 在整个方法论内连续编号（不按步骤重置）。
+
+## WP9 · 统计
+
+### 完成内容
+
+1. **`src/server/dto/stats.ts`**：统计的 DTO 与查询入参——
+   - `StatsQuery`（`tagId?`、`sourceId?`）；
+   - `MethodologyOverviewDto`（§9.1 的全部字段，`execTrend` 为 `{ endedAt, executionScore, difficulty, mode, hintUsed }[]`）；
+   - `ConfusionRowDto`（§9.2）、`DifficultyBucketDto` / `DifficultyOverallDto` / `MethodologyDifficultyDto` / `DifficultyGapDto` / `StatsDifficultyDto`（§9.3）；
+   - `WeakestMethodologyDto`（首页「最需要练习」）。
+2. **`src/server/services/stats.ts`**：只读 `status='debriefed'` 的练习（`practice_sessions ⨝ scenarios ⨝ debriefs`），执行分用改判后重算的 `executionScore`。
+   - `getStatsOverview(filter, options)`：执行归属于 `selectedMethodologyId`，识别归属于场景的目标方法论；`drillCount`/`quizCount`、`execAvgAll`、`execAvgRecent`（最近 `STATS_RECENT_WINDOW` 场）、`execAvgWithHint`/`execAvgWithoutHint`（仅专项练习）、`execTrend`（最近 `STATS_TREND_LIMIT` 场，按 `endedAt` 正序）、`recognitionAccuracy`（0–1，识别得分均值）与 `recognitionN`、`mastery`（复用 `domain/mastery.ts`）、`lastPracticedAt`；默认按掌握度升序。
+   - 列出范围：**全部已确认**方法论 + **有历史练习的已归档**方法论（标「已归档」）；没有任何练习的已归档与 draft 不列出（已与你确认）。
+   - `getStatsConfusion(filter)`：只列 `selectedId ≠ targetId` 的综合测验，按 `wrongCount + partialCount` 降序；标签 / 资料筛选时目标或所选任一方匹配即保留（已与你确认）。
+   - `getStatsDifficulty(filter)`：`overall` 按执行归属筛选，每个难度给出 `{ n, execAvg, outcomeDistribution }`；`byMethodology` 与概览同集合，每档 `{ n, execAvg } | null`；`largestGap` 取配合档与强硬档都有练习的方法论中「配合 − 强硬」最大者。
+   - `listWeakestMethodologies(limit = HOME_WEAKEST_COUNT, options)`：已确认方法论中掌握度最低的 3 个（并列按名称）。
+3. **接口**：`GET /api/stats/overview|confusion|difficulty`（均支持 `?tagId&sourceId`，入参非法返回 400）。
+4. **页面 `/stats`**（`api-and-ui.md` §4.11）：顶部标签 / 资料筛选（URL 驱动，`components/stats/stats-filters.tsx`）；三个页签（`components/stats/stats-view.tsx`）——
+   - **方法论概览**：表格（名称 + 已归档徽章、标签、专项 / 测验场数、全部均值、最近 5 场、看过 / 未看提示、识别正确率〔场数〕、掌握度、最近练习、执行分迷你折线）；点击行展开大图，折线点按难度着色、查看过提示的点用空心；空状态区分「库为空」与「筛选后为空」。
+   - **识别混淆**：`目标 → 误选` 列表（错误 / 部分正确次数 + 「对比」链接到 `/library/compare`）；空状态说明完成综合测验后会出现。
+   - **难度分层**：三档柱状图（执行分均值）+ 总体表（场数、均值、说服结果分布）+ 按方法论表格（三档均值，`largestGap` 行高亮）。
+5. **首页「最需要练习」**（`components/home/weakest-methodologies.tsx`）：掌握度最低的 3 个方法论，各带「专项练习」按钮，按 pick 模式直接创建练习并跳转（难度用「一般」）。首页其余模块（快捷入口、最近 5 场）按计划属 WP10，未实现。
+6. **测试** `tests/server/stats.test.ts`（14 个用例，内存库）：概览每个字段的聚合（含 `execAvgRecent`/趋势截断/提示折算/识别正确率/掌握度值）、已确认全部 + 有历史的已归档的列出范围、标签与资料筛选、空库；混淆的组合与排序、双方匹配筛选；难度分层的总体与按方法论、`largestGap`、筛选；「最需要练习」的排序、limit、排除归档 / 候选，以及未复盘的练习不计入。
+
+### 验证方式
+
+```
+pnpm lint         # 通过
+pnpm typecheck    # 通过
+pnpm test         # 33 个文件 / 442 个用例通过（新增 1 个文件 / 14 个用例）
+pnpm build        # 通过；/api/stats/{overview,confusion,difficulty} 与 /stats 为动态路由
+```
+
+另用 `AXIOM_FAKE_LLM=1` + 临时 `AXIOM_DATA_DIR` + `db:seed` 启动 `next start`，走通：
+- 专项练习端到端：创建 → 开始 → 发 2 条消息 → 结束 → 复盘（执行分 40）后，`/api/stats/overview` 中「向领导提加薪」的 `execAvgAll=40`、`drillCount=1`、`lastPracticedAt` 有值、`mastery>0`；`/api/stats/difficulty` 的总体 `neutral { n:1, execAvg:40 }` 与按方法论表一致。
+- 综合测验端到端（选对 → `recognition='correct'`）；`/stats`、`/` 返回 200 且渲染出三个页签、概览表格与首页「最需要练习」的 3 个条目。
+
+### 已知限制
+
+- **未在浏览器里点开图表 / 页签 / 展开行**：只有类型检查、lint、构建、接口与页面 HTML 级验证；recharts 折线的难度着色与空心点需要人工看一眼。
+- **未用真实数据（多场真实练习）验收**：`/stats` 各视图与历史记录的一致性只用构造的集成数据与 Fake 练习验证。
+- 识别正确率字段 `recognitionAccuracy` 返回 **0–1**（与 `RECOGNITION_SCORE` 一致），页面上按百分比展示；计划 §9.1 未规定单位。
+- `largestGap` 允许为负（某方法论强硬档反而更高时），前端会照常高亮；`algorithms.md` 未说是否要过滤负值。
+- 「方法论概览」与「难度分层·按方法论」列出「已确认全部 + 有历史的已归档」，因此从未练过的已确认方法论会以 `mastery=0`、各项均值 `null` 出现在最前面（已与你确认）。
+- 首页只接了「最需要练习」模块；快捷入口与「最近 5 场」属 WP10。首页「专项练习」按钮固定用「一般」难度，没有难度选择（计划只要求一个按钮）。
+- 统计页三个页签的切换是客户端状态，不写入 URL（筛选条件才写 URL）；刷新后回到「方法论概览」。
+- `GET /api/stats/*` 一次返回全量聚合结果，没有分页 / 缓存；练习量大到数千场时可能变慢（MVP 单用户可接受）。
+- **顺手修了一处与本包无关的测试脆弱性**：`tests/server/practice.test.ts` 的 DTO 泄露断言原本用 `json.includes(阻力 id)`（如 `r1`）判断角色卡是否泄露，而 nanoid 生成的主键偶然会包含 `r1` 这类子串，导致偶发失败（本次 `pnpm test` 就触发了一次）。改为按带引号的 JSON 值 `"r1"` 比对，语义不变。
+
+### 对公共契约的改动
+
+均为向后兼容的新增，已同步 `docs/plan/`：
+
+- 新增接口 `GET /api/stats/overview`、`GET /api/stats/confusion`、`GET /api/stats/difficulty`（`?tagId&sourceId`），与 `api-and-ui.md` §3「统计」一致；返回形状见 `src/server/dto/stats.ts`（比计划多返回方法论的 `status`/`tags` 与趋势点上的 `mode`/`hintUsed`，供页面渲染）。
+- `src/domain/constants.ts` 与 `README.md` §6 新增 `STATS_TREND_LIMIT`（30）、`STATS_RECENT_WINDOW`（5）、`HOME_WEAKEST_COUNT`（3）。
+- `algorithms.md` §9 补充：§9.1 列出哪些方法论、§9.2 混淆行的筛选口径、§9.3 按方法论表格的集合与 `largestGap` 参与条件、新增 §9.4 首页「最需要练习」的口径。
+- 服务层新增 `services/stats.ts`（`getStatsOverview` / `getStatsConfusion` / `getStatsDifficulty` / `listWeakestMethodologies`），接受 `{ database?, now? }` 供测试注入；`now` 仅用于掌握度的时间衰减。
+- 未改动任何既有表结构、既有 schemas 或既有接口。

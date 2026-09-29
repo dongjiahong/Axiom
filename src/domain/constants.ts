@@ -137,3 +137,12 @@ export const QUALITY_DEFAULT = { done: 3, partial: 2 } as const;
 
 /** 提示词中要求证据引用（用户原话逐字片段）的长度范围。 */
 export const EVIDENCE_QUOTE_CHARS = { min: 4, max: 80 } as const;
+
+/** 统计：概览中执行分趋势保留的最近场数（algorithms.md §9.1）。 */
+export const STATS_TREND_LIMIT = 30;
+
+/** 统计：概览中 execAvgRecent 取的最近场数（§9.1）。 */
+export const STATS_RECENT_WINDOW = 5;
+
+/** 首页「最需要练习」列出的方法论数量（api-and-ui.md §4.1）。 */
+export const HOME_WEAKEST_COUNT = 3;

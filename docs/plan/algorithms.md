@@ -227,12 +227,21 @@ pickWeighted(items: { id, mastery }[], rng: () => number): string
 
 默认按 mastery 升序（最需要练的在前）。
 
+列出哪些方法论：**全部已确认的方法论**，加上**有历史练习的已归档方法论**（标"已归档"）；没有任何练习的已归档方法论与候选（draft）方法论都不列出。从未练习过的已确认方法论 mastery=0，排在最后练习过的方法论之前。
+
 ### 9.2 识别混淆
 
 - 行：`{ targetId, targetName, selectedId, selectedName, wrongCount, partialCount }`，只列 `selectedId ≠ targetId` 的组合，按 `wrongCount + partialCount` 降序。
+- 按标签 / 资料筛选时，目标或所选方法论**任一方匹配即保留**该行。
 - 每行提供"对比"入口：`/library/compare?a={targetId}&b={selectedId}`，并排展示两者的适用条件、反例、步骤标题。
 
 ### 9.3 难度分层
 
 - 总体：每个难度 `{ n, execAvg, outcomeDistribution: Record<Outcome, number> }`。
 - 按方法论：`{ methodologyId, name, byDifficulty: Record<Difficulty, { n, execAvg } | null> }`，突出"配合档分数 − 强硬档分数"差值最大的方法论。
+
+- 总体（overall）按**执行归属**（所用方法论）筛选；按方法论的表格列出与 §9.1 相同的方法论集合（已确认全部 + 有历史的已归档），同样受标签 / 资料筛选。只有某个方法论在配合与强硬两档都有练习时，才参与"差值最大"的比较（差值可为负）。
+
+### 9.4 首页「最需要练习」
+
+`api-and-ui.md` §4.1 的模块复用 §7 的掌握度：取**已确认**方法论中掌握度最低的 3 个（掌握度并列时按名称排序），返回 `{ id, name, tags, mastery, lastPracticedAt }`。

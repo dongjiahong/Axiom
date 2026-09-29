@@ -619,11 +619,15 @@ describe("会话 DTO 不泄露隐藏字段（data-model.md §4）", () => {
       brief.yieldConditions,
       brief.breakdownConditions,
       ...brief.hiddenConcerns,
-      ...brief.plannedResistance.flatMap((r) => [r.id, r.trigger, r.reaction]),
+      ...brief.plannedResistance.flatMap((r) => [r.trigger, r.reaction]),
       scenario.designNotes,
       ...scenario.alternatives.map((alt) => alt.reason),
     ];
     for (const value of briefValues) expect(json).not.toContain(value);
+    // 阻力 id 形如 r1/r2，短且可能偶然出现在 nanoid 里，按带引号的 JSON 值比对
+    for (const resistance of brief.plannedResistance) {
+      expect(json).not.toContain(`"${resistance.id}"`);
+    }
   }
 
   it("综合测验 briefing：无目标/备选/设计说明/角色卡，候选只有 id、名称、标签且按名称排序", async () => {

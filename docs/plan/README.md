@@ -184,6 +184,9 @@ src/server/jobs/*     ← 进程内任务队列（抽取）
 | `QUALITY_MAX` | 5 | 质量分满分 |
 | `QUALITY_DEFAULT` | done 3 / partial 2 | AI 未给质量分时的默认值 |
 | `EVIDENCE_QUOTE_CHARS` | 4–80 | 提示词中要求的证据引用长度 |
+| `STATS_TREND_LIMIT` | 30 | 统计概览中执行分趋势保留的最近场数 |
+| `STATS_RECENT_WINDOW` | 5 | 统计概览中「最近 N 场」执行分均值取的场数 |
+| `HOME_WEAKEST_COUNT` | 3 | 首页「最需要练习」列出的方法论数量 |
 
 ## 7. 工作包与依赖
 
