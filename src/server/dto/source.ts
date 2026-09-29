@@ -1,6 +1,6 @@
 import type { JobStage, JobStatus, SourceFormat, SourceStatus } from "@/server/db/schema";
 
-/** 资料相关 DTO（api-and-ui.md §3「资料与任务」）。 */
+/** 资料相关 DTO。 */
 
 export interface SourceListItemDto {
   id: string;

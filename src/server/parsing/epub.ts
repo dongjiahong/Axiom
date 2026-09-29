@@ -6,7 +6,7 @@ import { fallbackTitle, type ParsedSection, type ParsedSource } from "./detect";
 import { ParseError } from "./errors";
 
 /**
- * epub 解析（algorithms.md §1.2）。
+ * epub 解析。
  * 目录取 EPUB3 nav.xhtml，其次 EPUB2 toc.ncx，只保留顶层与第二层条目。
  */
 

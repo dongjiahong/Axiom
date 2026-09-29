@@ -88,7 +88,7 @@ function Sparkline({ points }: { points: TrendPoint[] }) {
   );
 }
 
-/** 折线点按难度着色；查看过提示的点用空心表示（api-and-ui.md §4.11）。 */
+/** 折线点按难度着色；查看过提示的点用空心表示。 */
 function TrendDot(props: { cx?: number; cy?: number; payload?: TrendPoint }) {
   const { cx, cy, payload } = props;
   if (cx === undefined || cy === undefined || !payload) return <g />;

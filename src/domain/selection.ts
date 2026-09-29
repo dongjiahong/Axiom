@@ -1,7 +1,7 @@
 import { SELECTION_EPSILON } from "./constants";
 import type { Scope } from "./schemas";
 
-/** 选题（algorithms.md §8）：范围解析与按掌握度加权随机。 */
+/** 选题：范围解析与按掌握度加权随机。 */
 
 export interface ScopeCandidate {
   id: string;

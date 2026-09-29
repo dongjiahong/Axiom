@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * 占位页面：WP0 只搭骨架，各功能区在后续工作包中实现。
+ * 占位页面（目前没有页面在用）。
  */
 export function PlaceholderPage({
   title,

@@ -2,7 +2,7 @@
 
 把书籍中的沟通方法论抽取成骨架，再用 AI 生成情景、扮演对方进行多轮对话练习，并对“方法选得对不对”和“步骤做得到不到位”进行评判与统计。
 
-本地单用户 Web 应用（见 `docs/adr/0006-local-single-user-typescript.md`）：Next.js 全栈 TypeScript + 本地 SQLite + 单个 OpenAI 兼容模型，界面与内容全部中文。也可以部署到自己的服务器，见下文「部署」。
+本地单用户 Web 应用：Next.js 全栈 TypeScript + 本地 SQLite + 单个 OpenAI 兼容模型，界面与内容全部中文。也可以部署到自己的服务器，见下文「部署」。
 
 ## 安装
 
@@ -86,7 +86,7 @@ pnpm dev           # 开发模式，http://localhost:3000
 
 ### 部署前必须知道
 
-- **应用没有账号系统**（ADR-0006 的前提是“本机单用户”），设置页里还保存着模型 API Key（明文）。放到服务器上必须设置门禁口令 `AXIOM_ACCESS_PASSWORD`（见「配置 → 门禁」）并使用 HTTPS，否则任何能访问该地址的人都能用你的模型额度、查看和删除数据。Nginx 层还可以按需再加 Basic Auth 或 IP 白名单（`deploy/nginx/axiom.conf` 里有注释示例）。
+- **应用没有账号系统**（设计前提是“本机单用户”），设置页里还保存着模型 API Key（明文）。放到服务器上必须设置门禁口令 `AXIOM_ACCESS_PASSWORD`（见「配置 → 门禁」）并使用 HTTPS，否则任何能访问该地址的人都能用你的模型额度、查看和删除数据。Nginx 层还可以按需再加 Basic Auth 或 IP 白名单（`deploy/nginx/axiom.conf` 里有注释示例）。
 - **只能跑一个实例**：数据存 SQLite，抽取任务在进程内排队。不要用多副本、负载均衡或 Node cluster。
 - **应用只监听 `127.0.0.1:3000`**，对外只开放 Nginx 的 80 / 443（例如 `sudo ufw allow 'Nginx Full'`）。
 - 数据库迁移在应用启动时自动执行（见「数据目录」），升级时不需要手动迁移。
@@ -255,6 +255,4 @@ AXIOM_FAKE_LLM=1 pnpm dev
 ## 文档
 
 - `CONTEXT.md`：领域术语（代码命名与界面文案都必须使用这里的术语）。
-- `docs/adr/`：已确定的架构决策。
-- `docs/plan/`：实现计划（数据模型、AI 提示词、算法口径、接口与页面、工作包、交付说明）。
 - `AGENTS.md`：执行者须知（分层规则、硬性约束）。

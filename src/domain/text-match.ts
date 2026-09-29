@@ -1,7 +1,7 @@
 import { FUZZY_SEGMENT_LENGTH, FUZZY_SEGMENT_STEP, FUZZY_THRESHOLD, MATCH_MIN_CHARS } from "./constants";
 import type { SourceExcerpt } from "./schemas";
 
-/** 文本归一化与原文摘录核对（algorithms.md §2–3）。纯函数，无 IO。 */
+/** 文本归一化与原文摘录核对。纯函数，无 IO。 */
 
 const DROPPED = /[\s\p{P}\p{S}]/u;
 

@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Difficulty, Outcome, PracticeMode } from "@/domain/schemas";
 import type { MethodologyStatus } from "@/server/db/schema";
 
-/** 统计的客户端 DTO（algorithms.md §9、api-and-ui.md §4.11）。 */
+/** 统计的客户端 DTO。 */
 
 export const StatsQuery = z.object({
   tagId: z.string().min(1).optional(),
@@ -20,7 +20,7 @@ export interface ExecTrendPointDto {
   hintUsed: boolean;
 }
 
-/** 方法论概览的一行（§9.1）。 */
+/** 方法论概览的一行。 */
 export interface MethodologyOverviewDto {
   methodologyId: string;
   name: string;
@@ -42,7 +42,7 @@ export interface MethodologyOverviewDto {
   lastPracticedAt: number | null;
 }
 
-/** 识别混淆的一行（§9.2）：目标方法论 X 被误选为 Y。 */
+/** 识别混淆的一行：目标方法论 X 被误选为 Y。 */
 export interface ConfusionRowDto {
   targetId: string;
   targetName: string;
@@ -83,7 +83,7 @@ export interface StatsDifficultyDto {
   largestGap: DifficultyGapDto | null;
 }
 
-/** 首页「最需要练习」的一项（§4.1）。 */
+/** 首页「最需要练习」的一项。 */
 export interface WeakestMethodologyDto {
   id: string;
   name: string;

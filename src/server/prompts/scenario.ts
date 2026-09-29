@@ -11,7 +11,7 @@ import type { TaskDef } from "@/server/llm/run-task";
 
 import { outputFormatPrompt } from "./common";
 
-/** 任务四：场景生成 `scenario`（llm-and-prompts.md §8）。 */
+/** 任务四：场景生成 `scenario`。 */
 
 export interface ScenarioInput {
   mode: PracticeMode;

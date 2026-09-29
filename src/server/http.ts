@@ -8,7 +8,7 @@ import {
 } from "@/server/llm/errors";
 import { zodErrorToMessages } from "@/server/prompts/common";
 
-/** 接口层通用工具：错误响应 `{ error: { code, message } }`（api-and-ui.md §1）。 */
+/** 接口层通用工具：错误响应 `{ error: { code, message } }`。 */
 
 export type ApiErrorCode =
   | "invalid_input"

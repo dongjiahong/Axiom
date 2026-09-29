@@ -15,7 +15,7 @@ import {
 } from "pdf-lib";
 
 /**
- * 生成测试夹具（work-packages.md WP3）：
+ * 生成测试夹具：
  *   pnpm tsx scripts/make-fixtures.ts
  * 产物提交到 tests/fixtures/，测试直接读取，不依赖本脚本运行。
  */

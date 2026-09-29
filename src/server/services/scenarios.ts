@@ -23,7 +23,7 @@ import {
   methodologyRef,
 } from "@/server/prompts/scenario";
 
-/** 选题与场景生成（api-and-ui.md §2.3「创建」，algorithms.md §8）。 */
+/** 选题与场景生成。 */
 
 export interface ScenarioServiceOptions {
   database?: AppDatabase;
@@ -102,7 +102,7 @@ interface Selection {
   scoped: ConfirmedMethodology[];
 }
 
-/** 校验并确定目标方法论（algorithms.md §8）。 */
+/** 校验并确定目标方法论。 */
 function selectTarget(
   params: CreatePracticeInput,
   confirmed: ConfirmedMethodology[],

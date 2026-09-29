@@ -4,7 +4,7 @@ import { SEED_METHODOLOGIES } from "../../scripts/seed-data";
 import { validateMethodologyForConfirm } from "@/domain/methodology-validate";
 import { MethodologyBody } from "@/domain/schemas";
 
-/** 种子数据必须通过 MethodologyBody 校验与确认校验（work-packages.md WP1 验收）。 */
+/** 种子数据必须通过 MethodologyBody 校验与确认校验。 */
 describe("种子方法论", () => {
   it("共 5 个：4 个已确认 + 1 个候选", () => {
     expect(SEED_METHODOLOGIES).toHaveLength(5);

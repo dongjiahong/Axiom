@@ -14,7 +14,7 @@ import type {
   ScoreBreakdown,
 } from "./schemas";
 
-/** 执行分（algorithms.md §5）。纯函数，无 IO。 */
+/** 执行分。纯函数，无 IO。 */
 
 // ───────────── 5.1 判定与质量分收敛 ─────────────
 

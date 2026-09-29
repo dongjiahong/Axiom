@@ -9,7 +9,7 @@ import {
 
 import { fallbackTitle, type ParsedSection, type ParsedSource } from "./detect";
 
-/** txt 解析（algorithms.md §1.4–1.5）；标题正则同时供无书签 PDF 复用。 */
+/** txt 解析；标题正则同时供无书签 PDF 复用。 */
 
 /** 前置内容（第一个标题之前的部分）的标题。 */
 export const LEADING_SECTION_TITLE = "前言";

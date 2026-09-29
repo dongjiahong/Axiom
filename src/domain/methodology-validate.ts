@@ -1,7 +1,7 @@
 import type { MethodologyBody, SourceExcerpt } from "./schemas";
 
 /**
- * 确认入库前的校验（api-and-ui.md §2.2）。
+ * 确认入库前的校验。
  * 返回中文问题列表，path 为表单字段路径，便于界面定位到对应字段；空数组表示可以确认。
  */
 export interface ValidationIssue {

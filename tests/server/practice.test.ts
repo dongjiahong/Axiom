@@ -582,7 +582,7 @@ describe("查看提示", () => {
   });
 });
 
-describe("会话 DTO 不泄露隐藏字段（data-model.md §4）", () => {
+describe("会话 DTO 不泄露隐藏字段", () => {
   const HIDDEN_KEYS = ["targetMethodologyId", "targetMethodologyName", "targetVersion", "alternatives", "designNotes", "brief", "meta", "targetSnapshot", "selectedSnapshot", "candidateIds", "scope"];
 
   async function setupQuiz() {

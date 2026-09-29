@@ -27,7 +27,7 @@ import { describeIssue, formatIssuePath } from "@/server/prompts/common";
 
 import { setMethodologyTags } from "./tags";
 
-/** 方法论库：列表、编辑保存、状态迁移、拆分、合并（api-and-ui.md §2.2）。 */
+/** 方法论库：列表、编辑保存、状态迁移、拆分、合并。 */
 
 export interface MethodologyServiceOptions {
   database?: AppDatabase;

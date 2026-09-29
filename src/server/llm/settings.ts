@@ -8,7 +8,7 @@ import { settings } from "@/server/db/schema";
 import { isFakeLLM } from "./fake";
 import { LLMNotConfiguredError } from "./errors";
 
-/** 读写 `settings.llm` / `settings.practice`（data-model.md §3）；环境变量优先于数据库。 */
+/** 读写 `settings.llm` / `settings.practice`；环境变量优先于数据库。 */
 
 export interface LLMSettings {
   baseUrl: string;

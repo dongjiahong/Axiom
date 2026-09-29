@@ -40,7 +40,7 @@ import {
 
 import { generateScenario, type ScenarioServiceOptions } from "./scenarios";
 
-/** 练习会话：创建、选择、开始、查看提示、对话与结束（api-and-ui.md §2.3）。复盘由后续工作包实现。 */
+/** 练习会话：创建、选择、开始、查看提示、对话与结束。 */
 
 type SessionRow = typeof practiceSessions.$inferSelect;
 type ScenarioRow = typeof scenarios.$inferSelect;
@@ -437,7 +437,7 @@ export function endSession(
 
 // ───────────── 历史与重练 ─────────────
 
-/** 历史列表（api-and-ui.md §4.10）：按创建时间倒序分页。 */
+/** 历史列表：按创建时间倒序分页。 */
 export function listSessions(
   query: { page?: number; pageSize?: number } = {},
   database: AppDatabase = db,

@@ -9,7 +9,7 @@ import { mergeTask, type MergeInput, type MergeOutput } from "@/server/prompts/m
 import { insertDraft, tagNamesByMethodology } from "./drafts";
 import { aiToBody, bodyToAi, normalizeTagNames } from "./mapping";
 
-/** 把一组 draft 合并为新 draft（llm-and-prompts.md §7）：抽取流水线的高置信组与用户手动合并共用。 */
+/** 把一组 draft 合并为新 draft：抽取流水线的高置信组与用户手动合并共用。 */
 
 export type MergeFn = (input: MergeInput, ctx: TaskContext) => Promise<MergeOutput>;
 

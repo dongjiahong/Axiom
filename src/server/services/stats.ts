@@ -31,8 +31,8 @@ import type {
 } from "@/server/dto/stats";
 
 /**
- * 统计（algorithms.md §9）：只统计 `status='debriefed'` 的练习，分数用改判后重算的执行分。
- * 执行归属于 selectedMethodologyId，识别归属于场景的目标方法论；按方法论的 ID 聚合（ADR-0003）。
+ * 统计：只统计 `status='debriefed'` 的练习，分数用改判后重算的执行分。
+ * 执行归属于 selectedMethodologyId，识别归属于场景的目标方法论；按方法论的 ID 聚合。
  */
 
 export interface StatsOptions {
@@ -193,7 +193,7 @@ function statisticMethodologies(
     );
 }
 
-// ───────────── 概览（§9.1） ─────────────
+// ───────────── 概览 ─────────────
 
 function toOverviewRow(
   info: MethodologyInfo,
@@ -252,7 +252,7 @@ export function getStatsOverview(
   );
 }
 
-// ───────────── 识别混淆（§9.2） ─────────────
+// ───────────── 识别混淆 ─────────────
 
 export function getStatsConfusion(
   filter: StatsQuery = {},
@@ -297,7 +297,7 @@ export function getStatsConfusion(
   );
 }
 
-// ───────────── 难度分层（§9.3） ─────────────
+// ───────────── 难度分层 ─────────────
 
 export function getStatsDifficulty(
   filter: StatsQuery = {},
@@ -365,7 +365,7 @@ export function getStatsDifficulty(
   };
 }
 
-// ───────────── 首页「最需要练习」（§4.1） ─────────────
+// ───────────── 首页「最需要练习」 ─────────────
 
 export function listWeakestMethodologies(
   limit: number = HOME_WEAKEST_COUNT,

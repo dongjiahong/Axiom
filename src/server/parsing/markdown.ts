@@ -9,7 +9,7 @@ import {
   type RawSection,
 } from "./text";
 
-/** Markdown 解析（algorithms.md §1.4）。 */
+/** Markdown 解析。 */
 
 /** 依次尝试 #、##、### 作为分节级别（只看该级别的标题）。 */
 const LEVELS = [1, 2, 3];

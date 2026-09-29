@@ -42,7 +42,7 @@ function StatusBadge({ item }: { item: SessionListItemDto }) {
   );
 }
 
-/** 再练一次：以同一场景新建一场练习（api-and-ui.md §4.9、§4.10）。 */
+/** 再练一次：以同一场景新建一场练习。 */
 export function SessionsTable({ items }: { items: SessionListItemDto[] }) {
   return (
     <>

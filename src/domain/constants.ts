@@ -1,5 +1,5 @@
 /**
- * 可调参数集中在此（见 docs/plan/README.md §6）。
+ * 可调参数集中在此。
  * 领域代码与 service 不得再写魔法数字。
  */
 
@@ -15,7 +15,7 @@ export const CHUNK_MAX_CHARS = 20000;
 /** 抽取并发数。 */
 export const EXTRACT_CONCURRENCY = 2;
 
-/** 判定与质量分的一致性范围（algorithms.md §5.1）。 */
+/** 判定与质量分的一致性范围。 */
 export const QUALITY_RANGE = {
   done: { min: 3, max: 5 },
   partial: { min: 1, max: 3 },
@@ -108,10 +108,10 @@ export const TEXT_NUMBERED_TITLE_MAX_COUNT = 200;
 export const MD_SECTION_MIN_COUNT = 3;
 export const MD_SECTION_MAX_COUNT = 200;
 
-/** 识别结果对应的得分（algorithms.md §6），掌握度与统计共用。 */
+/** 识别结果对应的得分，掌握度与统计共用。 */
 export const RECOGNITION_SCORE = { correct: 1, partial: 0.5, wrong: 0 } as const;
 
-/** 各难度允许的计划阻力数量（含端点，llm-and-prompts.md §8）。 */
+/** 各难度允许的计划阻力数量（含端点）。 */
 export const RESISTANCE_COUNT_RANGE = {
   cooperative: { min: 1, max: 2 },
   neutral: { min: 2, max: 3 },
@@ -127,10 +127,10 @@ export const SCENARIO_LEAK_MIN_STEP_TITLE_CHARS = 4;
 /** 综合测验选题范围内至少需要的已确认方法论数。 */
 export const QUIZ_MIN_SCOPE_SIZE = 2;
 
-/** 用户单条消息的字数上限（api-and-ui.md §3）。 */
+/** 用户单条消息的字数上限。 */
 export const MESSAGE_MAX_CHARS = 1000;
 
-/** 对方单次回复 `reply` 的字数上限（llm-and-prompts.md §9）；提示词中要求更短，此为校验上限。 */
+/** 对方单次回复 `reply` 的字数上限；提示词中要求更短，此为校验上限。 */
 export const COUNTERPART_REPLY_MAX_CHARS = 300;
 
 /** 提示词中要求对方每次回复不超过的字数。 */
@@ -139,23 +139,23 @@ export const COUNTERPART_REPLY_PROMPT_CHARS = 120;
 /** 质量分的满分（1–5 星）。 */
 export const QUALITY_MAX = 5;
 
-/** AI 未给出质量分时，done / partial 判定采用的默认质量分（algorithms.md §5.1）。 */
+/** AI 未给出质量分时，done / partial 判定采用的默认质量分。 */
 export const QUALITY_DEFAULT = { done: 3, partial: 2 } as const;
 
 /** 提示词中要求证据引用（用户原话逐字片段）的长度范围。 */
 export const EVIDENCE_QUOTE_CHARS = { min: 4, max: 80 } as const;
 
-/** 统计：概览中执行分趋势保留的最近场数（algorithms.md §9.1）。 */
+/** 统计：概览中执行分趋势保留的最近场数。 */
 export const STATS_TREND_LIMIT = 30;
 
-/** 统计：概览中 execAvgRecent 取的最近场数（§9.1）。 */
+/** 统计：概览中 execAvgRecent 取的最近场数。 */
 export const STATS_RECENT_WINDOW = 5;
 
-/** 首页「最需要练习」列出的方法论数量（api-and-ui.md §4.1）。 */
+/** 首页「最需要练习」列出的方法论数量。 */
 export const HOME_WEAKEST_COUNT = 3;
 
-/** 首页「最近练习」列出的场数（api-and-ui.md §4.1）。 */
+/** 首页「最近练习」列出的场数。 */
 export const HOME_RECENT_SESSIONS = 5;
 
-/** 历史页每页显示的练习场数（api-and-ui.md §4.10）。 */
+/** 历史页每页显示的练习场数。 */
 export const HISTORY_PAGE_SIZE = 20;

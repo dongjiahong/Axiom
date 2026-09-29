@@ -61,7 +61,7 @@ export function updatePracticeSettings(
 }
 
 /**
- * 测试连接（llm-and-prompts.md §2）：探测 temperature 与 JSON 模式支持，结果写回 settings.llm。
+ * 测试连接：探测 temperature 与 JSON 模式支持，结果写回 settings.llm。
  * Fake 模式下不访问网络，也不写回探测结果。
  */
 export async function testLLMConnection(

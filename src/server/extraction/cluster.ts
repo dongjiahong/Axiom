@@ -1,7 +1,7 @@
 import { CLUSTER_BATCH_OVERLAP, CLUSTER_BATCH_SIZE } from "@/domain/constants";
 import type { ClusterInput, ClusterItem, ClusterOutput } from "@/server/prompts/cluster";
 
-/** 去重聚类的分批与结果合并（llm-and-prompts.md §6）。 */
+/** 去重聚类的分批与结果合并。 */
 
 export type ClusterGroup = ClusterOutput["groups"][number];
 

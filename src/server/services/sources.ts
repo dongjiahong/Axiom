@@ -21,7 +21,7 @@ import {
   parseSource,
 } from "@/server/parsing";
 
-/** 资料导入与解析（work-packages.md WP3）。 */
+/** 资料导入与解析。 */
 
 export interface SourceServiceOptions {
   database?: AppDatabase;

@@ -8,7 +8,7 @@ import {
 } from "./constants";
 import type { PracticeMode, Recognition } from "./schemas";
 
-/** 掌握度（algorithms.md §7）：纯函数，输入已复盘练习的记录与当前时间。 */
+/** 掌握度：纯函数，输入已复盘练习的记录与当前时间。 */
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 

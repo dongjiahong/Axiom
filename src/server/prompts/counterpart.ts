@@ -8,7 +8,7 @@ import type { TaskDef } from "@/server/llm/run-task";
 import { outputFormatPrompt } from "./common";
 
 /**
- * 任务五：对方回复 `counterpart`（llm-and-prompts.md §9）。
+ * 任务五：对方回复 `counterpart`。
  * 不向对方提供目标方法论，避免对方"配合考点"；只提供场景、角色卡与轮次信息。
  */
 

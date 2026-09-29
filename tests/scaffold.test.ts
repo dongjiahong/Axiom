@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 /**
- * WP0 的占位测试：确认左侧导航对应的页面骨架都已存在且可被加载。
- * 后续工作包用真实的领域与集成测试替换/补充它。
+ * 确认左侧导航对应的页面模块都存在且可被加载。
  */
 const PAGE_MODULES = [
   "@/app/page",

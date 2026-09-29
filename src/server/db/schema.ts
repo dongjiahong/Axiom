@@ -21,7 +21,7 @@ import type {
 } from "../../domain/schemas";
 
 /**
- * 数据库表（见 docs/plan/data-model.md §3）。
+ * 数据库表。
  * 主键为 nanoid（21 位）字符串，时间为 Unix 毫秒，JSON 列以 JSON 字符串存储。
  */
 

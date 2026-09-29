@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-/** 通用提示词片段与 Zod 错误中文化（llm-and-prompts.md §4）。 */
+/** 通用提示词片段与 Zod 错误中文化。 */
 
 /** 每个任务的系统提示词末尾都附上；`schemaDescription` 由任务手写，须与 Zod schema 同步。 */
 export function outputFormatPrompt(schemaDescription: string): string {

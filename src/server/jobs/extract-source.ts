@@ -30,7 +30,7 @@ import { mergeTask, type MergeInput, type MergeOutput } from "@/server/prompts/m
 import { describeJobError } from "./errors";
 import type { JobContext, JobHandler } from "./runner";
 
-/** `extract_source` 处理器（api-and-ui.md §2.1）：章节抽取 → 去重聚类 → 合并 / 生成合并建议。 */
+/** `extract_source` 处理器：章节抽取 → 去重聚类 → 合并 / 生成合并建议。 */
 
 /** 三个 AI 任务的入口；默认走 runTask，测试可替换为桩。 */
 export interface ExtractTasks {

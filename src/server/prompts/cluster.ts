@@ -5,7 +5,7 @@ import type { TaskDef } from "@/server/llm/run-task";
 
 import { outputFormatPrompt } from "./common";
 
-/** 任务二：去重聚类 `cluster`（llm-and-prompts.md §6）。仅在同一资料内部聚类。 */
+/** 任务二：去重聚类 `cluster`。仅在同一资料内部聚类。 */
 
 export const ClusterOutput = z.object({
   groups: z.array(

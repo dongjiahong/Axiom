@@ -7,7 +7,7 @@ import { jobs, sourceChunks, type JobType } from "@/server/db/schema";
 import { describeJobError } from "./errors";
 import { extractSourceHandler } from "./extract-source";
 
-/** 进程内任务队列（api-and-ui.md §2.1）：同一时间只运行一个 job，状态持久化在 jobs 表。 */
+/** 进程内任务队列：同一时间只运行一个 job，状态持久化在 jobs 表。 */
 
 export type JobRow = typeof jobs.$inferSelect;
 

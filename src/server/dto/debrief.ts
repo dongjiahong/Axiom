@@ -19,7 +19,7 @@ import type { SessionDto } from "./session";
 
 /**
  * 复盘的客户端 DTO。只在会话已复盘（debriefed）后生成，因此可以包含目标方法论、
- * 场景隐藏字段等（data-model.md §4）。
+ * 场景隐藏字段等。
  */
 
 export const OverrideInput = z.object({

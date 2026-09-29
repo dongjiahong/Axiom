@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 /**
- * 领域模型（见 docs/plan/data-model.md §2）。
- * 方法论正文存为一个带稳定 ID 的 JSON 文档（ADR-0007）。
+ * 领域模型。
+ * 方法论正文存为一个带稳定 ID 的 JSON 文档。
  * 本文件只放纯类型与 Zod 模型，不依赖数据库、Next 或网络。
  */
 
@@ -181,7 +181,7 @@ export const MessageMeta = z.object({
 });
 export type MessageMeta = z.infer<typeof MessageMeta>;
 
-/** 复盘的执行分明细（algorithms.md §5.3）。 */
+/** 复盘的执行分明细。 */
 export const ScoreBreakdown = z.object({
   base: z.number(),
   steps: z.array(

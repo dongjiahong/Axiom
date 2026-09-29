@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test, type Page } from "playwright/test";
 
 /**
- * WP10 的端到端流程（AXIOM_FAKE_LLM=1，数据目录由 playwright.config.ts 每次重建）。
+ * 端到端流程（AXIOM_FAKE_LLM=1，数据目录由 playwright.config.ts 每次重建）。
  * 覆盖：导入资料 → 抽取 → 确认方法论 → 专项练习 → 复盘改判 → 统计；综合测验 → 复盘识别。
  */
 

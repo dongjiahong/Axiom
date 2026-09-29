@@ -5,7 +5,7 @@ import type { TaskDef } from "@/server/llm/run-task";
 
 import { outputFormatPrompt } from "./common";
 
-/** 任务一：章节抽取 `extract_chunk`（llm-and-prompts.md §5）。 */
+/** 任务一：章节抽取 `extract_chunk`。 */
 
 const AiNode = { excerpt: z.string().nullable(), inferred: z.boolean() };
 const AiItem = z.object({ text: z.string().min(1), ...AiNode });

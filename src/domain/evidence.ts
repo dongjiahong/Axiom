@@ -1,7 +1,7 @@
 import { findText } from "./text-match";
 import type { Evidence, KeyPointVerdictValue, PrincipleVerdictValue } from "./schemas";
 
-/** 证据核对与降级（algorithms.md §4）。纯函数，无 IO。 */
+/** 证据核对与降级。纯函数，无 IO。 */
 
 export interface UserMessageText {
   turn: number;

@@ -2,7 +2,7 @@ import { CHUNK_MAX_CHARS, CHUNK_MIN_CHARS } from "@/domain/constants";
 
 import type { ParsedSection } from "./detect";
 
-/** 分块（algorithms.md §1.6）：章节 → 抽取的最小单位 SourceChunk。 */
+/** 分块：章节 → 抽取的最小单位 SourceChunk。 */
 
 export interface Chunk {
   /** 顺序号，从 1 开始。 */

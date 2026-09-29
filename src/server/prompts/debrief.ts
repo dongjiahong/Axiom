@@ -12,7 +12,7 @@ import type { TaskDef } from "@/server/llm/run-task";
 
 import { outputFormatPrompt } from "./common";
 
-/** 任务六：复盘 `debrief`（llm-and-prompts.md §10）。 */
+/** 任务六：复盘 `debrief`。 */
 
 export interface DebriefInput {
   mode: "drill" | "quiz";

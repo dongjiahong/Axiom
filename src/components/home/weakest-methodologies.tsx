@@ -13,7 +13,7 @@ import type { WeakestMethodologyDto } from "@/server/dto/stats";
 
 import { formatDate, formatMastery } from "@/components/stats/labels";
 
-/** 首页「最需要练习」：掌握度最低的方法论，每个可直接开始一场专项练习（api-and-ui.md §4.1）。 */
+/** 首页「最需要练习」：掌握度最低的方法论，每个可直接开始一场专项练习。 */
 export function WeakestMethodologies({ items }: { items: WeakestMethodologyDto[] }) {
   const router = useRouter();
   const [starting, setStarting] = useState<string | null>(null);

@@ -25,7 +25,7 @@ import { makeMethodologyBody } from "../fixtures/methodology";
 import { createTestDb, type TestDb } from "../helpers/db";
 
 /**
- * 统计（algorithms.md §9）：只统计已复盘的练习；执行归属于所用方法论，识别归属于目标方法论。
+ * 统计：只统计已复盘的练习；执行归属于所用方法论，识别归属于目标方法论。
  * 每个 describe 自建所需的最小数据（beforeEach 清库）。
  */
 
@@ -227,7 +227,7 @@ function tagIdOf(name: string): string {
   return row!.id;
 }
 
-// ───────────── 概览（§9.1） ─────────────
+// ───────────── 概览 ─────────────
 
 describe("方法论概览", () => {
   const M1 = "m1";
@@ -260,7 +260,7 @@ describe("方法论概览", () => {
     addSession({ target: M1, mode: "quiz", difficulty: "tough", at: 13, executionScore: 0, status: "active" });
   });
 
-  it("每个字段按 §9.1 口径聚合，且不统计未复盘的练习", () => {
+  it("每个字段按统计口径聚合，且不统计未复盘的练习", () => {
     const m1 = overviewRow("甲方法");
     expect(m1).toEqual({
       methodologyId: M1,
@@ -380,7 +380,7 @@ describe("方法论概览", () => {
   });
 });
 
-// ───────────── 识别混淆（§9.2） ─────────────
+// ───────────── 识别混淆 ─────────────
 
 describe("识别混淆", () => {
   const MA = "ma";
@@ -450,7 +450,7 @@ describe("识别混淆", () => {
   });
 });
 
-// ───────────── 难度分层（§9.3） ─────────────
+// ───────────── 难度分层 ─────────────
 
 describe("难度分层", () => {
   const M1 = "m1";
@@ -537,7 +537,7 @@ describe("难度分层", () => {
   });
 });
 
-// ───────────── 首页「最需要练习」（§4.1） ─────────────
+// ───────────── 首页「最需要练习」 ─────────────
 
 describe("最需要练习", () => {
   const M1 = "m1";

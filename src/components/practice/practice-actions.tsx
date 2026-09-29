@@ -8,7 +8,7 @@ import { requestJson } from "@/components/methodology/labels";
 import { Button } from "@/components/ui/button";
 import type { Difficulty } from "@/domain/schemas";
 
-/** 复盘页与历史页的练习入口（api-and-ui.md §4.9、§4.10）。 */
+/** 复盘页与历史页的练习入口。 */
 
 /** 再练一次：以同一场景新建一场练习，模式沿用该场景上一次的练习。 */
 export function RetryButton({

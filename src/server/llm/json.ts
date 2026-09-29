@@ -40,7 +40,7 @@ function parseLoose(candidate: string): ExtractJsonResult {
 }
 
 /**
- * 从模型输出中提取 JSON 对象（llm-and-prompts.md §3）：
+ * 从模型输出中提取 JSON 对象：
  * 去掉推理块 → 取第一个代码块 → 截取 `{…}` → JSON.parse → jsonrepair 兜底。
  */
 export function extractJson(text: string): ExtractJsonResult {

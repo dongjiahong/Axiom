@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/sheet";
 import type { OriginChunkDto } from "@/server/dto/methodology";
 
-/** 原文摘录的核对徽章与原文抽屉（algorithms.md §3）。 */
+/** 原文摘录的核对徽章与原文抽屉。 */
 
 export interface ExcerptNode {
   excerpt: SourceExcerpt | null;

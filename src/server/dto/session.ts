@@ -17,7 +17,7 @@ import {
 import type { MessageRole, SessionStatus } from "@/server/db/schema";
 
 /**
- * 练习会话的客户端 DTO（data-model.md §4）。
+ * 练习会话的客户端 DTO。
  * 隐藏字段只在 debriefed / debrief_failed 状态下才会出现在结果里（键本身不存在，而不是 null），
  * 综合测验在复盘前也不下发目标方法论与候选方法论的正文。
  */
@@ -123,7 +123,7 @@ export interface CandidateDto {
   tags: string[];
 }
 
-/** 历史列表 / 首页「最近练习」的单条记录（api-and-ui.md §4.10）。 */
+/** 历史列表 / 首页「最近练习」的单条记录。 */
 export interface SessionListItemDto {
   id: string;
   scenarioId: string;

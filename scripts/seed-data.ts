@@ -10,7 +10,7 @@ import type {
 } from "../src/domain/schemas";
 
 /**
- * 种子方法论（work-packages.md WP1 任务 7）。
+ * 种子方法论。
  * 全部 `sourceId=null`、`createdBy='seed'`；没有资料来源，因此每个节点都不带原文摘录，
  * 并标记为 `inferred=true`（数据模型中 `excerpt=null` 与 `inferred=true` 成对出现）。
  */

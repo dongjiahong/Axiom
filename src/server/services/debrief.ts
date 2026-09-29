@@ -47,7 +47,7 @@ import {
 
 import { getSession } from "./practice";
 
-/** 复盘：组装输入 → AI 判定 → 证据核对与降级 → 识别与执行分（代码）→ 落库；改判后重算（api-and-ui.md §2.3）。 */
+/** 复盘：组装输入 → AI 判定 → 证据核对与降级 → 识别与执行分（代码）→ 落库；改判后重算。 */
 
 type SessionRow = typeof practiceSessions.$inferSelect;
 type ScenarioRow = typeof scenarios.$inferSelect;

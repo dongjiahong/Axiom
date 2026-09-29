@@ -4,7 +4,7 @@ import type { TaskDef } from "@/server/llm/run-task";
 import { outputFormatPrompt } from "./common";
 import { AI_METHODOLOGY_DESCRIPTION, AiMethodology, validateAiMethodology } from "./extract-chunk";
 
-/** 任务三：合并 `merge`（llm-and-prompts.md §7）。输出与抽取任务里的单个方法论同一结构。 */
+/** 任务三：合并 `merge`。输出与抽取任务里的单个方法论同一结构。 */
 
 export interface MergeInput {
   drafts: AiMethodology[];

@@ -1,6 +1,6 @@
 import { ParseError } from "./errors";
 
-/** 资料解析（algorithms.md §1）。 */
+/** 资料解析。 */
 
 /** 资料格式（与 db/schema.ts 的 SourceFormat 一致）。 */
 export type SourceFormat = "epub" | "pdf" | "txt" | "md";
@@ -11,7 +11,7 @@ export interface ParsedSection {
   text: string;
 }
 
-/** 所有解析器统一输出（algorithms.md §1）。 */
+/** 所有解析器统一输出。 */
 export interface ParsedSource {
   title: string;
   author: string | null;
