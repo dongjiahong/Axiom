@@ -119,3 +119,12 @@ export const SCENARIO_LEAK_MIN_STEP_TITLE_CHARS = 4;
 
 /** 综合测验选题范围内至少需要的已确认方法论数。 */
 export const QUIZ_MIN_SCOPE_SIZE = 2;
+
+/** 用户单条消息的字数上限（api-and-ui.md §3）。 */
+export const MESSAGE_MAX_CHARS = 1000;
+
+/** 对方单次回复 `reply` 的字数上限（llm-and-prompts.md §9）；提示词中要求更短，此为校验上限。 */
+export const COUNTERPART_REPLY_MAX_CHARS = 300;
+
+/** 提示词中要求对方每次回复不超过的字数。 */
+export const COUNTERPART_REPLY_PROMPT_CHARS = 120;

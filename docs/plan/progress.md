@@ -346,3 +346,48 @@ pnpm build        # 通过（在临时拷贝中构建并验证，见下）
 - `SessionDto`（`src/server/dto/session.ts`）是 `GET /api/sessions/[id]` 的响应形状：`scenario` 只含可见字段；`candidates` 仅 quiz；`targetMethodologyId` / `targetMethodologyName` 在 drill 始终下发、quiz 复盘后才下发；`brief` / `designNotes` / `alternatives` / `targetSkeleton` / 消息 `meta` 只在 debriefed / debrief_failed 下发。WP7 / WP8 需沿用该 DTO 并在其上扩展。
 - `POST /api/sessions/[id]/select` 与 `/start` 返回更新后的 `SessionDto`，`/hint` 返回方法论骨架 `MethodologySkeletonDto`；`POST /api/practice` 返回 `{ sessionId }`。
 - 服务函数 `requestHint`（避免与 React Hook 命名规则冲突，未使用 `useHint`）。
+
+## WP7 · 练习对话
+
+### 完成内容
+
+1. **`src/server/prompts/counterpart.ts`**：`counterpartTask`（`counterpart@1`，温度 0.8）。输入 `{ scenario（含 brief）, difficulty, history, turn, maxTurns }`，不含目标方法论；`buildCounterpartMessages` 组装消息：唯一的 system 消息在最前（每次重新生成，含角色卡、阻力 id、当前轮次，最后一轮追加收尾提示，末尾重申输出格式）；历史中对方消息为 `assistant`（纯 reply 文本）、用户消息为 `user`；历史以对方开场白开头时前置一条 `user`「（对话开始）」。语义校验：`firedResistanceIds` 必须是已有阻力 id。`fake()` 按 `llm-and-prompts.md` §11 实现。
+2. **`services/practice.ts` 对话部分**
+   - `sendMessage`：仅 active；上一条是用户消息（上次生成失败）→ 409 提示先重试；已到轮数上限 → 409；插入用户消息（`turn` = 已有用户消息数 + 1，`seq` = 最后一条 `seq` + 1）→ 调对方任务 → 写回复（`meta` 记录 `firedResistanceIds` 与 `end`）→ 结束判定（对方 `end` 非空优先，其次 `turn >= maxTurns` → `turn_limit`）。生成失败时用户消息保留、错误照常抛出（502 / 409）。
+   - `regenerateReply`：仅当最后一条是用户消息时可用，与上面后半段共用同一段逻辑。
+   - `endSession`：active 才可结束；没有用户消息时删除会话并返回 `{ deleted: true }`，否则 `ended`（`endReason='user'`）。
+   - 写回复在事务内重新检查会话仍为 active 且最后一条消息未变，避免“生成期间用户手动结束”或并发重复触发时写入过期回复（409）。
+3. **接口**：`POST /api/sessions/[id]/messages`（`{ content }`，去空白后 1–1000 字）、`/regenerate`、`/end`。
+4. **页面**：`/practice/[sessionId]` 的 active 状态（`active-view.tsx`）：场景卡可折叠、“第 n / max 轮”、气泡对话（对方左、用户右）、“对方正在输入……”、失败时在最后一条用户消息下显示“生成失败，重试生成回复”并禁用输入、Enter 发送 / Shift+Enter 换行（输入法选词中的回车不发送）、专项练习的方法论骨架抽屉（首次打开才调用 `/hint`）、“结束练习”二次确认（无发言时提示会丢弃并跳回新建练习）。ended 状态（`ended-view.tsx`）：结束原因（“对方：{endNote}” / “已到达轮数上限” / “你结束了练习”）+ 完整对话 + “复盘功能开发中”占位。debriefed / debrief_failed 暂用同一视图，等待 WP8。
+5. **测试**：`tests/server/counterpart-task.test.ts`（8 个）：消息组装（唯一 system、阻力 id、末轮提示、开场白前置 user）、语义校验、schema 边界、fake。`tests/server/dialogue.test.ts`（21 个，内存库 + Fake 或桩）：有 / 无开场白的 turn 与 seq、meta 落库但不下发、传给对方任务的历史与轮次、内容校验、对方 `end`（agreed / broke_down / closed）、`turn_limit`、同轮对方宣告结束优先、最后一轮提示进入 messages、已结束 / briefing 状态 409、失败 → 用户消息保留 → 再发 409 → regenerate 恢复、多次失败后重试、重试后触发 `turn_limit`、生成期间被手动结束 → 409 且不写回复、结束时无用户消息 → 会话被删除、有用户消息 → `ended`。
+
+### 验证方式
+
+```
+pnpm lint         # 通过
+pnpm typecheck    # 通过
+pnpm test         # 28 个文件 / 335 个用例通过（新增 2 个文件 / 29 个用例）
+pnpm build        # 通过
+```
+
+另用 `AXIOM_FAKE_LLM=1` + 临时 `AXIOM_DATA_DIR` + `db:seed` 启动 `next start`，用 curl 走通：创建并开始专项练习 → 空消息 400 → 发消息得到用户消息与对方回复（turn 1，seq 连续）→ 对空闲会话 regenerate 返回 409 → 发“谢谢”后会话 `ended`（`agreed`，带 endNote）→ 再发消息 409 → 练习页返回 200 并渲染结束视图。
+
+### 已知限制
+
+- **未在浏览器里逐项操作 active 页面**（输入 / 发送 / 失败重试 / 结束确认 / 骨架抽屉只有类型检查、构建与接口层验证），需要人工点一遍。
+- **未用真实模型验证对方表演质量**（不跳出角色、按计划阻力施压、不轻易让步）：只在 Fake 与桩下验证，验收里“真实模型下人工检查”仍待做。
+- 计划中的“ended 后自动触发复盘”依赖 WP8 的接口，本包只显示“复盘功能开发中”，没有调用复盘接口。
+- 手动结束一个没有用户发言的会话会删除会话，但其场景记录保留（用于“最近场景标题”去重，也不影响其他数据）。
+- briefing 状态调用 `/end` 返回 409（计划只定义了 active 的结束）。
+- 内容为空时的 400 文案沿用通用 Zod 中文化（“content：长度不能小于 1”），未使用自定义文案；前端已在空内容时禁用发送按钮。
+
+### 对公共契约的改动
+
+均为向后兼容的补充：
+
+- `src/domain/constants.ts` 与 `README.md` §6 新增 `MESSAGE_MAX_CHARS`（1000）、`COUNTERPART_REPLY_MAX_CHARS`（300）、`COUNTERPART_REPLY_PROMPT_CHARS`（120）。
+- `POST /api/sessions/[id]/messages` 与 `/regenerate` 返回 `MessageResultDto`：`{ messages, session: { status, endReason, endNote, turn, maxTurns } }`。`messages` 在 `/messages` 为 `[用户消息, 对方回复]`，在 `/regenerate` 为 `[对方回复]`；相比计划的 `session` 摘要多了 `endNote`（结束视图需要）。消息不含 `meta`。
+- `POST /api/sessions/[id]/end` 返回更新后的 `SessionDto`，或 `{ deleted: true }`。
+- `src/server/dto/session.ts` 新增 `SendMessageInput`、`MessageResultDto`、`toMessageDto`（`toSessionDto` 改为复用它，行为不变）。
+- `services/practice.ts` 新增 `sendMessage`、`regenerateReply`、`endSession` 与测试注入点 `DialogueOptions.counterpart`。
+- `briefing-view.tsx` 导出 `Skeleton`（方法论骨架展示），供 active 页面的抽屉复用。

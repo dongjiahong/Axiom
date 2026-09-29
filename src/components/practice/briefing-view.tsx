@@ -13,7 +13,7 @@ import type { MethodologySkeletonDto, SessionDto } from "@/server/dto/session";
 
 import { ScenarioCard } from "./scenario-card";
 
-function Skeleton({ skeleton }: { skeleton: MethodologySkeletonDto }) {
+export function Skeleton({ skeleton }: { skeleton: MethodologySkeletonDto }) {
   return (
     <div className="space-y-4 text-sm">
       <p className="text-muted-foreground">{skeleton.summary}</p>

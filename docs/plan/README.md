@@ -179,6 +179,8 @@ src/server/jobs/*     ← 进程内任务队列（抽取）
 | `SCENARIO_RECENT_TITLES` | 10 | 场景生成时提供给 AI 的同一目标方法论最近场景标题数 |
 | `SCENARIO_LEAK_MIN_STEP_TITLE_CHARS` | 4 | 可见字段泄露检查中，参与比对的步骤标题最短长度 |
 | `QUIZ_MIN_SCOPE_SIZE` | 2 | 综合测验选题范围内至少需要的已确认方法论数 |
+| `MESSAGE_MAX_CHARS` | 1000 | 用户单条消息的字数上限 |
+| `COUNTERPART_REPLY_MAX_CHARS` / `COUNTERPART_REPLY_PROMPT_CHARS` | 300 / 120 | 对方回复的校验上限 / 提示词中要求的上限 |
 
 ## 7. 工作包与依赖
 

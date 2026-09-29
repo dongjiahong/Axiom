@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { MESSAGE_MAX_CHARS } from "@/domain/constants";
 import {
   Difficulty,
   PracticeMode,
@@ -29,6 +30,14 @@ export const CreatePracticeInput = z.object({
 export type CreatePracticeInput = z.infer<typeof CreatePracticeInput>;
 
 export const SelectMethodologyInput = z.object({ methodologyId: z.string().min(1) });
+
+export const SendMessageInput = z.object({
+  content: z
+    .string()
+    .trim()
+    .min(1, "消息不能为空")
+    .max(MESSAGE_MAX_CHARS, `消息不能超过 ${MESSAGE_MAX_CHARS} 字`),
+});
 
 /** 方法论骨架：只含练习时需要看的内容，不含原文摘录。 */
 export interface MethodologySkeletonDto {
@@ -81,6 +90,18 @@ export interface SessionMessageDto {
   content: string;
   /** 仅复盘后下发。 */
   meta?: MessageMeta | null;
+}
+
+/** 发消息 / 重试生成回复的结果：新增的消息与会话的最新状态。 */
+export interface MessageResultDto {
+  messages: SessionMessageDto[];
+  session: {
+    status: SessionStatus;
+    endReason: EndReason | null;
+    endNote: string | null;
+    turn: number;
+    maxTurns: number;
+  };
 }
 
 export interface CandidateDto {
@@ -175,6 +196,18 @@ export interface SessionRows {
   names: Map<string, string>;
 }
 
+/** 单条消息 DTO；`meta` 只在揭晓后下发。 */
+export function toMessageDto(m: SessionRows["messages"][number], revealed: boolean): SessionMessageDto {
+  return {
+    id: m.id,
+    seq: m.seq,
+    role: m.role,
+    turn: m.turn,
+    content: m.content,
+    ...(revealed ? { meta: m.meta } : {}),
+  };
+}
+
 /** 是否已到可以揭晓隐藏字段的阶段。 */
 export function isRevealed(status: SessionStatus): boolean {
   return status === "debriefed" || status === "debrief_failed";
@@ -212,14 +245,7 @@ export function toSessionDto(rows: SessionRows): SessionDto {
       openingLine: scenario.openingLine,
     },
     selectedMethodologyId: session.selectedMethodologyId,
-    messages: rows.messages.map((m) => ({
-      id: m.id,
-      seq: m.seq,
-      role: m.role,
-      turn: m.turn,
-      content: m.content,
-      ...(revealed ? { meta: m.meta } : {}),
-    })),
+    messages: rows.messages.map((m) => toMessageDto(m, revealed)),
   };
 
   if (session.mode === "quiz") {
