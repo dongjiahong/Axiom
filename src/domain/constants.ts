@@ -81,6 +81,13 @@ export const MAX_TURNS_MAX = 30;
 /** 资料上传的文件大小上限（50MB）。 */
 export const UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
 
+/** 门禁通行 Cookie 的有效期（毫秒）：7 天。 */
+export const GATE_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** 门禁口令连续输错的次数上限，以及计数与锁定的时间窗口（毫秒）。 */
+export const GATE_MAX_FAILURES = 5;
+export const GATE_FAILURE_WINDOW_MS = 15 * 60 * 1000;
+
 /** 判定扫描版 PDF 的平均每页有效字符下限。 */
 export const PDF_MIN_CHARS_PER_PAGE = 50;
 

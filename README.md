@@ -20,6 +20,7 @@ pnpm exec playwright install chromium   # 只有要跑端到端测试时才需�
 | 变量 | 说明 |
 | --- | --- |
 | `AXIOM_DATA_DIR` | 数据目录，默认 `./data` |
+| `AXIOM_ACCESS_PASSWORD` | 门禁口令。非空时访问页面与接口都要先输入口令；留空则不启用（本机自用即可）。见「门禁」 |
 | `AXIOM_FAKE_LLM` | 设为 `1` 时所有 AI 任务返回确定性的假数据，无需配置模型 |
 | `AXIOM_LLM_BASE_URL` | OpenAI 兼容端点的 Base URL |
 | `AXIOM_LLM_API_KEY` | API Key |
@@ -28,6 +29,23 @@ pnpm exec playwright install chromium   # 只有要跑端到端测试时才需�
 也可以在设置页（`/settings`）填写 Base URL / API Key / 模型名，保存在本机数据库里（明文，仅本机单用户）。环境变量存在时优先于设置页，设置页会提示“已被环境变量覆盖”。
 
 API Key 不会写入日志、`llm_calls`、错误信息或任何接口响应；接口只返回掩码（如 `sk-****abcd`）。
+
+### 门禁
+
+在 `.env.local` 里设置 `AXIOM_ACCESS_PASSWORD` 后，第一次访问会先跳到口令页，输对后 7 天内无需再输。适合放到服务器上时挡住陌生人（应用本身没有账号系统）。
+
+```bash
+# 生成一个足够长的随机口令
+openssl rand -base64 24
+```
+
+- **保护范围**：所有页面和 `/api/*` 接口。未通过时页面跳转到 `/gate`，接口返回 `401`。
+- **凭证**：通过后下发 `HttpOnly` Cookie，内容是过期时间加 HMAC 签名，不含口令；只有 HTTPS 下才带 `Secure`。
+- **改口令即失效**：签名密钥就是口令，修改后所有已通过的浏览器都要重新输入。
+- **防猜**：同一来源连续输错 5 次，锁定 15 分钟（按 Nginx 传来的 `X-Real-IP` 区分来源）。
+- **不启用**：口令留空或不设置时不启用，本地开发与自动化测试都不受影响。生产模式下没设置口令，启动日志会给出警告。
+- **没有“退出”按钮**：想让某台设备失效，清除该站点的 Cookie，或直接修改口令。
+- **忘记口令**：口令就在 `.env.local` 里，修改后重启服务。
 
 ## 启动
 
@@ -68,7 +86,7 @@ pnpm dev           # 开发模式，http://localhost:3000
 
 ### 部署前必须知道
 
-- **应用本身没有账号系统**（ADR-0006 的前提是“本机单用户”），设置页里还保存着模型 API Key（明文）。所以不要把它直接暴露到公网，`deploy/nginx/axiom.conf` 默认用 HTTPS 加 Basic Auth 挡一层；如果只在固定 IP 使用，也可以改成 IP 白名单（配置里有注释示例）。
+- **应用没有账号系统**（ADR-0006 的前提是“本机单用户”），设置页里还保存着模型 API Key（明文）。放到服务器上必须设置门禁口令 `AXIOM_ACCESS_PASSWORD`（见「配置 → 门禁」）并使用 HTTPS，否则任何能访问该地址的人都能用你的模型额度、查看和删除数据。Nginx 层还可以按需再加 Basic Auth 或 IP 白名单（`deploy/nginx/axiom.conf` 里有注释示例）。
 - **只能跑一个实例**：数据存 SQLite，抽取任务在进程内排队。不要用多副本、负载均衡或 Node cluster。
 - **应用只监听 `127.0.0.1:3000`**，对外只开放 Nginx 的 80 / 443（例如 `sudo ufw allow 'Nginx Full'`）。
 - 数据库迁移在应用启动时自动执行（见「数据目录」），升级时不需要手动迁移。
@@ -80,7 +98,7 @@ pnpm dev           # 开发模式，http://localhost:3000
 
 ```bash
 sudo apt update
-sudo apt install -y nginx certbot apache2-utils sqlite3 git build-essential python3
+sudo apt install -y nginx certbot sqlite3 git build-essential python3
 ```
 
 - Node.js 22+ 请按官方方式安装，然后执行 `sudo corepack enable` 获得 pnpm 10。
@@ -94,11 +112,12 @@ sudo install -d -o axiom -g axiom /opt/axiom /var/lib/axiom
 sudo -u axiom -H git clone <仓库地址> /opt/axiom
 ```
 
-先写配置，再构建。构建阶段会加载服务端模块，可能顺带打开并迁移数据库，所以要让它落在数据目录里：
+先写配置，再构建。构建阶段会加载服务端模块，可能顺带打开并迁移数据库，所以要让它落在数据目录里。门禁口令先用 `openssl rand -base64 24` 生成一个，填到下面的 `AXIOM_ACCESS_PASSWORD`：
 
 ```bash
 sudo -u axiom tee /opt/axiom/.env.local >/dev/null <<'EOF'
 AXIOM_DATA_DIR=/var/lib/axiom
+AXIOM_ACCESS_PASSWORD=换成你生成的口令
 # 也可以不写下面三项，启动后在设置页填写
 AXIOM_LLM_BASE_URL=https://你的兼容端点/v1
 AXIOM_LLM_API_KEY=sk-xxxx
@@ -109,7 +128,7 @@ sudo chmod 600 /opt/axiom/.env.local
 sudo -u axiom -H bash -c 'cd /opt/axiom && pnpm install --frozen-lockfile && pnpm build'
 ```
 
-`.env.local` 里有 API Key，权限保持 `600`。变量含义见「配置」。
+`.env.local` 里有口令和 API Key，权限保持 `600`。变量含义见「配置」。
 
 ### 3. 用 systemd 托管
 
@@ -123,13 +142,7 @@ curl -sI http://127.0.0.1:3000/ | head -1     # 应返回 HTTP/1.1 200
 
 ### 4. 配置 Nginx 与 HTTPS
 
-**a. 创建登录密码**（Basic Auth，把用户名换成你自己的）：
-
-```bash
-sudo htpasswd -c /etc/nginx/.axiom-htpasswd 你的用户名
-```
-
-**b. 申请证书。** 最终配置引用了尚不存在的证书文件，`nginx -t` 会失败，所以先放一个只处理证书校验的最小配置：
+**a. 申请证书。** 最终配置引用了尚不存在的证书文件，`nginx -t` 会失败，所以先放一个只处理证书校验的最小配置：
 
 ```bash
 sudo mkdir -p /var/www/certbot
@@ -144,7 +157,7 @@ sudo nginx -t && sudo systemctl reload nginx
 sudo certbot certonly --webroot -w /var/www/certbot -d axiom.example.com
 ```
 
-**c. 换成完整配置：**
+**b. 换成完整配置：**
 
 ```bash
 sudo cp /opt/axiom/deploy/nginx/axiom.conf /etc/nginx/conf.d/axiom.conf
@@ -154,6 +167,14 @@ sudo nginx -t && sudo systemctl reload nginx
 
 证书由 certbot 的定时任务自动续期，可用 `sudo certbot renew --dry-run` 检查。
 
+**c.（可选）在 Nginx 层再加一道 Basic Auth。** 有门禁后通常不需要，两层都开会要求输入两次。要开的话：
+
+```bash
+sudo apt install -y apache2-utils
+sudo htpasswd -c /etc/nginx/.axiom-htpasswd 你的用户名
+# 然后取消 /etc/nginx/conf.d/axiom.conf 里 auth_basic 两行的注释，再 sudo nginx -t && sudo systemctl reload nginx
+```
+
 配置里与本应用相关的几处：
 
 | 设置 | 原因 |
@@ -161,11 +182,19 @@ sudo nginx -t && sudo systemctl reload nginx
 | `client_max_body_size 55m` | 资料上传上限 50MB（`UPLOAD_MAX_BYTES`），multipart 会略大 |
 | `proxy_read_timeout 600s` | 对话回复与复盘在一次请求里等待模型返回，单次调用最长 180 秒（`LLM_TIMEOUT_MS`），含重试留足余量 |
 | `proxy_request_buffering off` | 大文件直接流给应用，不写 Nginx 临时文件 |
-| `auth_basic` | 应用没有登录，见上文 |
+| `proxy_set_header X-Real-IP $remote_addr` | 门禁按它区分来源来限制猜口令次数；用真实地址覆盖，客户端伪造不了 |
+| `X-Forwarded-Proto` / `Host` | 门禁跳转口令页、判断是否加 `Secure` Cookie 都依赖它们，不要去掉 |
 
 ### 5. 验证
 
-浏览器访问 `https://你的域名`，输入 Basic Auth 用户名密码后应看到首页；进设置页配置并“测试连接”，再上传一份小资料走一遍抽取。
+浏览器访问 `https://你的域名`，应先跳到口令页；输入门禁口令后看到首页。再进设置页配置并“测试连接”，上传一份小资料走一遍抽取。
+
+用 curl 确认没有绕过口令的入口（都应返回 `401`，页面则是 `307` 跳转到 `/gate`）：
+
+```bash
+curl -si https://你的域名/api/settings | head -1
+curl -si https://你的域名/api/sources | head -1
+```
 
 ### 日常运维
 
@@ -195,7 +224,9 @@ sudo -u axiom cp -a /var/lib/axiom/uploads/. $BACKUP/uploads/
 | 上传大文件返回 413 | 检查 `client_max_body_size` 是否生效（`sudo nginx -T \| grep client_max_body_size`） |
 | 对话或复盘时 504 | 模型响应慢，调大 `proxy_read_timeout`；同时检查模型端点是否可达 |
 | `pnpm install` 编译 `better-sqlite3` 失败 | 确认已装 `build-essential` 与 `python3`，且 Node 版本 ≥ 22 |
-| 反复弹出登录框 | 检查密码文件路径与权限：`sudo nginx -T \| grep auth_basic_user_file` |
+| 输对口令后又回到口令页 | 多半是用 `http://` 访问：HTTPS 下发的 Cookie 带 `Secure`，走 HTTP 会被浏览器丢弃。请用 HTTPS，并确认 Nginx 传了 `X-Forwarded-Proto` |
+| 口令页提示“尝试次数过多” | 同一来源输错 5 次会锁 15 分钟；重启服务可立即解除（计数只在内存里） |
+| 启用了 Basic Auth 后反复弹出登录框 | 检查密码文件路径与权限：`sudo nginx -T \| grep auth_basic_user_file` |
 
 ## Fake 模式（无 API Key 开发与测试）
 

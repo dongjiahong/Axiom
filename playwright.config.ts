@@ -26,6 +26,8 @@ export default defineConfig({
     timeout: 180_000,
     env: {
       AXIOM_FAKE_LLM: "1",
+      // 显式置空，避免 .env.local 里的门禁口令挡住端到端测试
+      AXIOM_ACCESS_PASSWORD: "",
       AXIOM_DATA_DIR: "./data/e2e",
     },
   },

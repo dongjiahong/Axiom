@@ -14,6 +14,8 @@ export type ApiErrorCode =
   | "invalid_input"
   | "not_found"
   | "invalid_state"
+  | "unauthorized"
+  | "too_many_attempts"
   | "llm_not_configured"
   | "llm_invalid_output"
   | "llm_unavailable"
