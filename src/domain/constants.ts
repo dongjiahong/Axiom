@@ -54,6 +54,14 @@ export const MATCH_MIN_CHARS = 4;
 /** 文本模糊匹配的命中比例阈值。 */
 export const FUZZY_THRESHOLD = 0.7;
 
+/** 模糊匹配：把摘录切成定长片段，逐片段在原文中查找。 */
+export const FUZZY_SEGMENT_LENGTH = 8;
+export const FUZZY_SEGMENT_STEP = 4;
+
+/** 去重聚类：条目超过批大小时分批，相邻批次重叠若干条目。 */
+export const CLUSTER_BATCH_SIZE = 150;
+export const CLUSTER_BATCH_OVERLAP = 20;
+
 /** 单次 AI 请求超时（毫秒）。 */
 export const LLM_TIMEOUT_MS = 180000;
 

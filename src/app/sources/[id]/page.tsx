@@ -1,14 +1,17 @@
 import { notFound } from "next/navigation";
 
 import { ChunkTable } from "@/components/sources/chunk-table";
+import { DraftList, MergeSuggestionList } from "@/components/sources/draft-list";
+import { ExtractionPanel } from "@/components/sources/extraction-panel";
 import {
   FORMAT_LABELS,
   formatCharCount,
   SOURCE_STATUS_LABELS,
 } from "@/components/sources/labels";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { TOKEN_ESTIMATE_PER_CHAR } from "@/domain/constants";
 import { ApiError } from "@/server/http";
+import { listMergeSuggestions, listSourceDrafts } from "@/server/services/extraction";
 import { getSourceDetail } from "@/server/services/sources";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +29,11 @@ export default async function SourceDetailPage({ params }: Props) {
     throw err;
   }
 
+  const pending = detail.chunks.filter((chunk) => chunk.extractionStatus === "pending");
+  const failedCount = detail.chunks.filter((chunk) => chunk.extractionStatus === "failed").length;
+  const pendingChars = pending.reduce((sum, chunk) => sum + chunk.charCount, 0);
+  const drafts = listSourceDrafts(id);
+  const suggestions = listMergeSuggestions(id);
   const notSkipped = detail.chunks.filter((chunk) => chunk.extractionStatus !== "skipped").length;
 
   return (
@@ -43,16 +51,14 @@ export default async function SourceDetailPage({ params }: Props) {
           {formatCharCount(detail.charCount)} · {detail.chunks.length} 个章节块（{notSkipped} 个待抽取）
           · 预估 {detail.estimatedTokens.toLocaleString("zh-CN")} token（粗略估计）
         </p>
-        <div className="flex flex-wrap gap-2">
-          {/* 抽取相关按钮由 WP4 接入，先禁用 */}
-          <Button disabled>开始抽取</Button>
-          <Button variant="outline" disabled>
-            取消
-          </Button>
-          <Button variant="outline" disabled>
-            重试失败章节
-          </Button>
-        </div>
+        <ExtractionPanel
+          sourceId={detail.id}
+          initialJob={detail.job}
+          pendingCount={pending.length}
+          failedCount={failedCount}
+          pendingChars={pendingChars}
+          pendingTokens={Math.round(pendingChars * TOKEN_ESTIMATE_PER_CHAR)}
+        />
       </div>
 
       <div className="space-y-2">
@@ -61,6 +67,18 @@ export default async function SourceDetailPage({ params }: Props) {
           <ChunkTable sourceId={detail.id} chunks={detail.chunks} />
         </div>
       </div>
+
+      <div className="space-y-2">
+        <h2 className="text-lg font-medium">本资料的候选方法论（{drafts.length}）</h2>
+        <DraftList drafts={drafts} />
+      </div>
+
+      {suggestions.length > 0 ? (
+        <div className="space-y-2">
+          <h2 className="text-lg font-medium">合并建议（{suggestions.length}）</h2>
+          <MergeSuggestionList suggestions={suggestions} />
+        </div>
+      ) : null}
     </div>
   );
 }

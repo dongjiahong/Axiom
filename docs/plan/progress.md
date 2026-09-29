@@ -190,3 +190,46 @@ pnpm tsx scripts/make-fixtures.ts   # 可重复生成 tests/fixtures/ 下的 6 �
 - `src/domain/constants.ts` 新增 `UPLOAD_MAX_BYTES`、`PDF_MIN_CHARS_PER_PAGE`、`PDF_HEADER_FOOTER_PAGE_RATIO`、`TOKEN_ESTIMATE_PER_CHAR`、`TEXT_TITLE_MAX_CHARS`、`TEXT_NUMBERED_TITLE_MIN_COUNT/MAX_COUNT`、`MD_SECTION_MIN_COUNT/MAX_COUNT`，并写入 `README.md` §6。
 - 上传文件路径定为 `${AXIOM_DATA_DIR}/uploads/<id>.<format>`（与 `data-model.md` 的 `data/uploads/<id>.<ext>` 一致）。
 - 新增依赖 `pdf-lib`（devDependency，仅 `scripts/make-fixtures.ts` 用于生成 PDF 夹具；运行时不使用）。
+
+## WP4 · 抽取流水线
+
+### 完成内容
+
+1. **`src/domain/text-match.ts`**：`normalizeWithMap`（逐字符 NFKC + 小写 + 去空白/标点/符号，同时产出「归一化下标 → 原文下标」映射）、`normalize`、`findText`、`matchExcerpt`（`algorithms.md` §2–3：精确 → 模糊 → 无；多个 haystack 时返回命中的 `chunkId`，精确命中优先于其他块的模糊命中，模糊命中取比例最高的块；还原出的片段超过摘录归一化长度 2 倍时截断）。
+2. **TaskDef**（`src/server/prompts/`）：`extract-chunk.ts`（导出 `AiMethodology`、`ExtractChunkOutput`、共用的 `validateAiMethodology` 与 `AI_METHODOLOGY_DESCRIPTION`）、`cluster.ts`、`merge.ts`，均含提示词、schema、`validate`、`fake`，`promptVersion` 分别为 `extract_chunk@1` / `cluster@1` / `merge@1`。
+3. **AI 输出 → 领域模型**（`src/server/extraction/`）：`mapping.ts`（`aiToBody` 分配 nanoid、核对摘录、`relatedStepIndexes` → `relatedStepIds`；`bodyToAi` 供合并任务；`normalizeTagNames`）、`cluster.ts`（>150 条按 150/重叠 20 分批、跨批有交集的组取并集）、`drafts.ts`（写入 draft 与按名称建标签）、`suggestions.ts`（写入合并建议，成员相同的建议不重复创建）。
+4. **任务队列**（`src/server/jobs/`）：`runner.ts`（`JobRunner`：同一时间 1 个 job、状态落 `jobs` 表、取消、`recover()`、`whenIdle()`；单例挂在 `globalThis`）、`extract-source.ts`（`extract_source` 处理器：章节抽取按 `EXTRACT_CONCURRENCY` 并发 → 聚类 → high 组自动合并 / medium 组写合并建议）、`errors.ts`（异常 → 中文说明）。`src/instrumentation.ts` 在 Node 运行时启动时调用 `recover()`。
+5. **`services/extraction.ts`**：`startExtraction`、`retryFailedChunks`、`getJob`、`cancelJob`、`listSourceDrafts`、`listMergeSuggestions`；DTO 在 `dto/job.ts`、`dto/extraction.ts`。
+6. **接口**：`POST /api/sources/[id]/extract`、`GET /api/jobs/[id]`、`POST /api/jobs/[id]/cancel`。
+7. **资料详情页**：`ExtractionPanel`（开始抽取确认框含待抽取块数与预估 token、按 2 秒轮询的进度条与阶段文字、取消、重试失败章节）、候选方法论列表、合并建议列表（接受/忽略按钮按计划隐藏，等 WP5）。
+8. **测试**：`tests/domain/text-match.test.ts`；`tests/server/extraction-units.test.ts`（各任务 fake 通过 schema+validate、语义校验、映射、聚类分批/并集）；`tests/server/extraction.test.ts`（Fake LLM 集成：摘录全为 exact、幂等、不删已确认方法论、同名自动合并并归档、medium 生成合并建议且不重复、自动合并失败降级为建议、失败块与重试、处理中取消并可继续、排队中取消、重启恢复）；`tests/server/extraction-fixtures.test.ts`（导入 4 个夹具后抽取）。
+
+### 验证方式
+
+```
+pnpm lint && pnpm typecheck   # 通过
+pnpm test                     # 21 个文件 / 188 个用例通过（新增 4 个文件 / 44 个用例）
+pnpm build                    # 通过
+```
+
+另用 `AXIOM_FAKE_LLM=1 next start`（独立 `AXIOM_DATA_DIR`）手工走通：上传 → `POST /extract` → 轮询 `GET /api/jobs/[id]` 至 `succeeded`；详情页返回 200；已结束的任务取消返回 409 中文错误；手工把 job 置为 `running` 后重启服务，`register()` 恢复并跑完该 job。
+
+### 已知限制
+
+- **未用真实模型和真实书籍验收**：WP4 验收条款「用真实模型导入一本中文沟通类书（epub），页面看到进度并产出候选方法论」尚未做；提示词效果（摘录逐字性、条件步骤划分、聚类质量）只在 Fake 模式和桩任务下验证。需要你配置模型后跑一本真实的书。
+- 合并建议的「接受/忽略」按钮未接入（WP5 的接口未完成，按计划隐藏）；候选方法论条目也暂无跳转链接。
+- 聚类失败（`cluster` 任务多次输出不合规或端点不可用）会使整个 job 为 `failed`，此时各章节的 draft 已保留、资料状态为「已抽取」，需再次点击「开始抽取」才会重新去重（此时没有待抽取块，只会重跑去重阶段）。单个高置信组的合并失败不会让 job 失败，而是降级为一条合并建议（原因中注明「自动合并失败」）。
+- 重新聚类时参与的 draft 包括本资料所有 `createdBy in (extraction, merge)` 且仍是 draft 的方法论，用户手工编辑过的 draft 也可能被自动合并；`algorithms.md` 对此未细说，待 WP5 有编辑功能后再评估是否需要排除。
+- AI 未给出摘录、又未标 `inferred` 的节点，映射时按「推断内容」处理（`inferred=true`，`excerpt=null`），而不是留成既无摘录也无推断标记的节点。
+- 失败章节块的 `extractionError` 只存经 `describeJobError` 处理的中文说明，原始异常只写服务端日志。
+- `JobRunner.cancel` 不抛 `ApiError`，任务不存在或已结束的判断放在 `services/extraction.ts`：单例在 `instrumentation` 里创建，生产构建下它与路由不是同一份模块图，`instanceof ApiError` 会失败（手工验证时发现）。
+- 删除资料时不检查是否有进行中的抽取任务（WP3 的 `deleteSource` 未改）；此时该 job 的后续写入会失败（未专门验证过具体表现）。
+
+### 对公共契约的改动
+
+无 schema / 表结构 / 既有接口的改动。补充内容：
+
+- `src/domain/constants.ts` 与 `README.md` §6 新增 `FUZZY_SEGMENT_LENGTH`（8）、`FUZZY_SEGMENT_STEP`（4）、`CLUSTER_BATCH_SIZE`（150）、`CLUSTER_BATCH_OVERLAP`（20）。
+- `extract_source` 处理器的三个 AI 调用经 `ExtractTasks`（`extractChunk` / `cluster` / `merge`）注入，默认走 `runTask`，测试可替换为桩。
+- `POST /api/sources/[id]/extract` 与 `GET /api/jobs/[id]` 返回 `JobDto`：`{ id, sourceId, status, stage, progressDone, progressTotal, error }`（比 `api-and-ui.md` 列出的字段多 `id`、`sourceId`）。`POST /extract` 在资料没有可抽取的章节块（全部已跳过）时返回 400，未配置模型且非 Fake 模式时返回 409（`llm_not_configured`）。
+- 「重试失败章节」与「开始抽取」共用 `POST /extract`（处理器本来就处理 pending 与 failed 两类块）。

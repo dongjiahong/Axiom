@@ -172,6 +172,8 @@ src/server/jobs/*     ← 进程内任务队列（抽取）
 | `TEXT_TITLE_MAX_CHARS` | 40 | 标题正则允许的最大行长 |
 | `TEXT_NUMBERED_TITLE_MIN_COUNT` / `TEXT_NUMBERED_TITLE_MAX_COUNT` | 3 / 200 | 数字编号标题正则启用所需的全文匹配数范围 |
 | `MD_SECTION_MIN_COUNT` / `MD_SECTION_MAX_COUNT` | 3 / 200 | Markdown 分节级别可接受的节数范围 |
+| `FUZZY_SEGMENT_LENGTH` / `FUZZY_SEGMENT_STEP` | 8 / 4 | 模糊匹配时摘录切成的片段长度与步长 |
+| `CLUSTER_BATCH_SIZE` / `CLUSTER_BATCH_OVERLAP` | 150 / 20 | 去重聚类的分批大小与相邻批次重叠条数 |
 
 ## 7. 工作包与依赖
 
