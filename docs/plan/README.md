@@ -181,6 +181,9 @@ src/server/jobs/*     ← 进程内任务队列（抽取）
 | `QUIZ_MIN_SCOPE_SIZE` | 2 | 综合测验选题范围内至少需要的已确认方法论数 |
 | `MESSAGE_MAX_CHARS` | 1000 | 用户单条消息的字数上限 |
 | `COUNTERPART_REPLY_MAX_CHARS` / `COUNTERPART_REPLY_PROMPT_CHARS` | 300 / 120 | 对方回复的校验上限 / 提示词中要求的上限 |
+| `QUALITY_MAX` | 5 | 质量分满分 |
+| `QUALITY_DEFAULT` | done 3 / partial 2 | AI 未给质量分时的默认值 |
+| `EVIDENCE_QUOTE_CHARS` | 4–80 | 提示词中要求的证据引用长度 |
 
 ## 7. 工作包与依赖
 

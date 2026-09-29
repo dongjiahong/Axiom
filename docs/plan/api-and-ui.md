@@ -143,10 +143,10 @@ POST /api/practice ──▶ briefing ──start──▶ active ──(用户�
 | POST | `/api/sessions/[id]/messages` | `{ content: string (1–1000 字) }` |
 | POST | `/api/sessions/[id]/regenerate` | 重试生成对方回复 |
 | POST | `/api/sessions/[id]/end` | 手动结束 |
-| POST | `/api/sessions/[id]/debrief` | 生成复盘（同步，可能 30–120 秒） |
+| POST | `/api/sessions/[id]/debrief` | 生成复盘（同步，可能 30–120 秒），返回 `DebriefDto`；同一场练习并发触发时复用同一次调用；已复盘 409 |
 | GET | `/api/sessions/[id]/debrief` | 复盘 DTO：识别、执行分与明细、整体印象分、说服结果、总结、按步骤分组的要点判定、原则判定、完整对话、目标/所选方法论快照、场景隐藏字段 |
-| PUT | `/api/verdicts/[id]/override` | `{ verdict, quality: number \| null, reason: string (必填) }` → 返回新的执行分与明细 |
-| DELETE | `/api/verdicts/[id]/override` | 撤销改判 |
+| PUT | `/api/verdicts/[id]/override` | `{ verdict, quality: number \| null, reason: string (必填) }`；质量分规则同 `algorithms.md` §5.1（不合规 400）→ 返回 `{ verdict: VerdictDto, executionScore, scoreBreakdown }` |
+| DELETE | `/api/verdicts/[id]/override` | 撤销改判（没有改判时 409），返回同上 |
 | POST | `/api/scenarios/[id]/retry` | 重练 |
 
 ### 统计

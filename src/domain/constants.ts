@@ -128,3 +128,12 @@ export const COUNTERPART_REPLY_MAX_CHARS = 300;
 
 /** 提示词中要求对方每次回复不超过的字数。 */
 export const COUNTERPART_REPLY_PROMPT_CHARS = 120;
+
+/** 质量分的满分（1–5 星）。 */
+export const QUALITY_MAX = 5;
+
+/** AI 未给出质量分时，done / partial 判定采用的默认质量分（algorithms.md §5.1）。 */
+export const QUALITY_DEFAULT = { done: 3, partial: 2 } as const;
+
+/** 提示词中要求证据引用（用户原话逐字片段）的长度范围。 */
+export const EVIDENCE_QUOTE_CHARS = { min: 4, max: 80 } as const;

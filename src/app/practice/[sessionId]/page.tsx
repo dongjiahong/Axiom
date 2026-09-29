@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { ActiveView } from "@/components/practice/active-view";
 import { BriefingView } from "@/components/practice/briefing-view";
@@ -22,6 +22,8 @@ export default async function PracticePage({ params }: Props) {
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
   }
+
+  if (session.status === "debriefed") redirect(`/practice/${sessionId}/debrief`);
 
   return (
     <div className="space-y-4">

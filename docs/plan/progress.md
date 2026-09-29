@@ -391,3 +391,56 @@ pnpm build        # 通过
 - `src/server/dto/session.ts` 新增 `SendMessageInput`、`MessageResultDto`、`toMessageDto`（`toSessionDto` 改为复用它，行为不变）。
 - `services/practice.ts` 新增 `sendMessage`、`regenerateReply`、`endSession` 与测试注入点 `DialogueOptions.counterpart`。
 - `briefing-view.tsx` 导出 `Skeleton`（方法论骨架展示），供 active 页面的抽屉复用。
+
+## WP8 · 复盘与改判
+
+### 完成内容
+
+1. **领域纯函数**（`src/domain/`）
+   - `evidence.ts`：`checkEvidence`（先在声称的轮次里精确 → 模糊核对，找不到再到其他用户消息里找并修正 `turn`，命中时 `quote` 换成用户真实原话；都找不到 `match='none'`）、`downgradeKeyPoint`（done/partial 无有效证据 → missed、质量分置空）、`downgradePrinciple`（violated 无有效证据 → kept）。
+   - `scoring.ts`：`convergeKeyPoint`（§5.1 质量分收敛，含非条件步骤的 not_triggered → missed）、`validateKeyPointOverride`（改判入参校验）、`computeExecutionScore`（§5.2：条件步骤全部未触发不计入分母；被触发条件步骤中残留的 not_triggered 按 missed；原则扣分封顶；strict 模式逆序扣分并报告第一对逆序步骤；条件步骤不参与顺序检查；结果裁剪到 0–100）。
+   - `recognition.ts`：`computeRecognition`（correct / partial / wrong 及得分，复用 `RECOGNITION_SCORE`）。
+2. **`src/server/prompts/debrief.ts`**：`debriefTask`（`debrief@1`，温度 0.2），含提示词、输出 schema、`fake()`，以及全部语义校验（引用恰好出现一次且无未知引用；not_triggered 只用于条件步骤；done/partial/violated 必须有证据；evidence 与 rewrite 的 turn 在 `1..userTurnCount`；partial/missed 必须有 rewrite 且 conceptRefs 已知；quiz 必须有识别解释、drill 必须为 null）。同时导出 `buildDebriefRefs` / `buildSelectedInput` / `buildTranscript`（短引用 `s/k/p/c` 与转录格式）。
+3. **`src/server/services/debrief.ts`**
+   - `generateDebrief`：仅 `ended` / `debrief_failed` 可调用；组装输入（短引用、转录、阻力触发记录、quiz 的识别信息）→ `runTask` → 质量分收敛 → 证据核对与降级 → 识别（代码）→ 执行分（代码）→ 同一事务写 `debriefs` + `verdicts` 并置 `debriefed`。任何失败都把会话置为 `debrief_failed` 后原样抛出（接口层映射为 502/409）。同一场练习并发触发时复用同一次调用（页面重复触发不会重复烧 AI）。
+   - `getDebrief`、`overrideVerdict`、`clearOverride`：改判/撤销后在事务内重算 `executionScore`、`scoreBreakdown`、`updatedAt`。
+4. **`src/server/dto/debrief.ts`**：`DebriefDto`（识别、执行分与明细、整体印象分、说服结果、总结、按步骤分组的要点判定、原则判定、概念、已揭晓的 `SessionDto`〔含完整对话、场景隐藏字段、目标方法论骨架〕）、`VerdictDto`、`OverrideInput`、`OverrideResultDto`。
+5. **接口**：`POST/GET /api/sessions/[id]/debrief`、`PUT/DELETE /api/verdicts/[id]/override`。
+6. **页面**
+   - `/practice/[sessionId]/debrief`：头部（执行分、整体印象分并注明不计入统计、说服结果、模式/难度/是否查看提示）、识别（仅 quiz，含备选、AI 解释、设计说明、错误时“对比两者”）、总结、扣分项、按步骤分组的要点卡片（判定、星级质量分、点评、可点击的证据、建议、降级提示、示范改写 + 概念讲解、改判/撤销改判）、原则、右侧完整对话（点击证据后滚动到该轮并高亮引用片段）。未触发的条件步骤折叠为“本场未触发”。改判弹窗（判定、质量分、必填理由）保存后即时刷新执行分。
+   - 练习页：`ended` 状态进入即自动复盘（“正在复盘……”），失败显示错误与“重试复盘”；`debrief_failed` 显示重试按钮；`debriefed` 重定向到复盘页。
+7. **测试**（新增 4 个文件 / 93 个用例）：`tests/domain/scoring.test.ts`（表驱动：全 done = 100、条件步骤排除/残留计 missed、原则扣分 0–4 条封顶、strict 逆序/同轮/最小轮次/无证据/条件步骤不参与/loose 不检查、裁剪与取整、收敛边界值、改判校验）、`tests/domain/evidence.test.ts`（精确/模糊/修正 turn/找不到/过短、降级表、识别三种结果）、`tests/server/debrief-task.test.ts`（引用与转录、fake 通过 schema+validate、每条语义校验）、`tests/server/debrief.test.ts`（Fake 复盘 verdicts 数 = 要点数 + 原则数、执行分、证据被核对、状态限制、并发去重、失败 → `debrief_failed` → 重试、降级/修正 turn/收敛/概念映射/顺序扣分、改判与撤销后分数变化、非法改判 400、quiz 三种识别、复盘前看不到隐藏字段而复盘后 GET 会话可见）。
+
+### 验证方式
+
+```
+pnpm lint         # 通过
+pnpm typecheck    # 通过
+pnpm test         # 32 个文件 / 428 个用例通过（新增 4 个文件 / 93 个用例）
+pnpm build        # 通过
+```
+
+另用 `AXIOM_FAKE_LLM=1` + 临时 `AXIOM_DATA_DIR` + `db:seed` 启动 `next start`，用 curl 走通：创建并开始专项练习 → 发 1 条消息 → 结束 → 复盘前 GET 返回 404 → `POST /debrief` 返回 200（执行分 40，条件步骤未计入）→ 改判一条要点后执行分变为 27 → 质量分不合规的改判返回 400 中文提示 → 撤销后恢复 40 → 复盘页返回 200 并渲染，练习页对已复盘会话 307 到复盘页。
+
+### 已知限制
+
+- **未在浏览器里逐项操作复盘页**（证据点击滚动高亮、改判弹窗、撤销、折叠对话、自动复盘的加载/失败/重试）：只有类型检查、lint、构建与页面 200 渲染验证，需要人工点一遍。
+- **未用真实模型验证判定质量**：提示词效果（证据是否逐字、条件步骤的 not_triggered 与 missed 区分、rewrite 质量、识别解释）只在 Fake 与桩输出下验证；验收里“quiz 显示识别结果与解释”在 Fake 下满足。
+- 复盘页底部只放了“开始新的练习”“返回首页”。“再练一次”“换个场景练同一方法论”依赖重练接口 `POST /api/scenarios/[id]/retry`，按计划属于 WP10，未提前实现。
+- Fake 复盘取“第 1 轮用户原话前 10 字”作证据：若用户第 1 条消息归一化后不足 4 个字，证据核对不通过，Fake 下的 done 会被降级为 missed（真实流程无影响）。
+- 执行分明细 `scoreBreakdown.steps[].value` 存 0–100（保留 1 位小数），而不是 0–1（`algorithms.md` §5.3 只写了 `number | null`）。
+- 顺序检查里，某个非条件步骤若有 done/partial 要点、但这些要点没有任何有效证据（例如被用户改判为“做到”而 AI 没找到原话），该步骤无法确定首次出现时机，不参与顺序检查（`algorithms.md` §5.2 未明确这种情形）。
+- 改判校验的具体口径（计划只写“套用 §5.1 规则，不合规返回 400”）：done 质量分须为 3–5 的整数、partial 为 1–3、missed/not_triggered 不得带质量分、非条件步骤不能改判为 not_triggered、原则只能在 kept/violated 之间改且不带质量分。改判为 done/partial 时质量分不能省略（不采用 AI 判定时的默认值）。
+- 已复盘的练习不能重新复盘（`POST /debrief` 返回 409）；计划没有“重新评判”的需求。
+- “AI 认为做到了但被降级为 missed”时不会补 `rewrite`（AI 当时没有为 done 给改写），页面上只显示降级提示。
+- 复盘中 `refType='session'`、`refId=sessionId` 记入 `llm_calls`。
+
+### 对公共契约的改动
+
+均为向后兼容的补充，已同步 `docs/plan/`：
+
+- `src/domain/constants.ts` 与 `README.md` §6 新增 `QUALITY_MAX`（5）、`QUALITY_DEFAULT`（done 3 / partial 2）、`EVIDENCE_QUOTE_CHARS`（4–80，仅用于提示词文案）。
+- `PUT` / `DELETE /api/verdicts/[id]/override` 返回 `{ verdict: VerdictDto, executionScore, scoreBreakdown }`（计划只写“返回新的执行分与明细”，多了更新后的判定，供页面就地刷新）；撤销一条没有改判的判定返回 409。
+- `POST /api/sessions/[id]/debrief` 返回 `DebriefDto`（与 `GET` 相同）；已复盘再调用返回 409；练习未结束返回 409。`GET` 在未复盘时返回 404 `not_found`。
+- `DebriefDto` 的形状见 `src/server/dto/debrief.ts`。其中 `session` 复用 WP6 的 `SessionDto`（此时已揭晓）；`steps[].keyPoints[]` 与 `principles[]` 是 `VerdictDto`（含 AI 原始判定、降级标记、证据、示范改写、改判信息与生效判定/质量分）。
+- `debrief` 任务输入的 `scenario` 只含可见字段 + 角色卡（阻力只带 `id/trigger/reaction`）+ `designNotes`；`selected` 的要点引用 `k1..` 在整个方法论内连续编号（不按步骤重置）。

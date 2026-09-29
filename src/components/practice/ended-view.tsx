@@ -1,8 +1,7 @@
-import Link from "next/link";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SessionDto } from "@/server/dto/session";
 
+import { DebriefTrigger } from "./debrief-trigger";
 import { MessageBubble } from "./message-list";
 import { ScenarioCard } from "./scenario-card";
 
@@ -21,7 +20,7 @@ function endReasonText(session: SessionDto): string {
   }
 }
 
-/** ended 状态：显示结束原因与完整对话。复盘由 WP8 接入，此前显示占位。 */
+/** ended / debrief_failed 状态：显示结束原因与完整对话，并触发（或重试）复盘。 */
 export function EndedView({ session }: { session: SessionDto }) {
   return (
     <div className="space-y-4">
@@ -40,12 +39,7 @@ export function EndedView({ session }: { session: SessionDto }) {
           ))}
         </CardContent>
       </Card>
-      <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-sm">
-        复盘功能开发中。
-        <Link href="/practice/new" className="text-foreground ml-1 underline">
-          返回新建练习
-        </Link>
-      </div>
+      <DebriefTrigger sessionId={session.id} auto={session.status === "ended"} />
     </div>
   );
 }
