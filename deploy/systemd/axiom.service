@@ -1,0 +1,32 @@
+# Axiom 的 systemd 服务。
+# 安装到 /etc/systemd/system/axiom.service。完整步骤见 README「部署」一节。
+#
+# 前提：
+#   - 代码在 /opt/axiom，已执行 pnpm install 与 pnpm build
+#   - 存在系统用户 axiom，并对 /opt/axiom 可读、对数据目录 /var/lib/axiom 可写
+#   - 配置写在 /opt/axiom/.env.local（Next 启动时自动读取），至少包含 AXIOM_DATA_DIR=/var/lib/axiom
+
+[Unit]
+Description=Axiom
+After=network.target
+
+[Service]
+Type=simple
+User=axiom
+Group=axiom
+# 数据库迁移文件按工作目录查找，必须在仓库根目录启动。
+WorkingDirectory=/opt/axiom
+Environment=NODE_ENV=production
+# node 的路径用 `command -v node` 确认；通过 nvm 安装时请改成绝对路径。
+# 只监听回环地址，由 Nginx 对外提供服务。
+ExecStart=/usr/bin/node /opt/axiom/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+Restart=on-failure
+RestartSec=3
+# 停止时给进行中的请求和写库一点时间。
+TimeoutStopSec=30
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

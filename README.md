@@ -2,7 +2,7 @@
 
 把书籍中的沟通方法论抽取成骨架，再用 AI 生成情景、扮演对方进行多轮对话练习，并对“方法选得对不对”和“步骤做得到不到位”进行评判与统计。
 
-本地单用户 Web 应用（见 `docs/adr/0006-local-single-user-typescript.md`）：Next.js 全栈 TypeScript + 本地 SQLite + 单个 OpenAI 兼容模型，界面与内容全部中文。
+本地单用户 Web 应用（见 `docs/adr/0006-local-single-user-typescript.md`）：Next.js 全栈 TypeScript + 本地 SQLite + 单个 OpenAI 兼容模型，界面与内容全部中文。也可以部署到自己的服务器，见下文「部署」。
 
 ## 安装
 
@@ -37,7 +37,7 @@ pnpm db:seed       # 可选：写入 4 个已确认 + 1 个候选的种子方法
 pnpm dev           # 开发模式，http://localhost:3000
 ```
 
-生产模式：`pnpm build && pnpm start`。
+生产模式：`pnpm build && pnpm start`。部署到服务器（systemd + Nginx + HTTPS）见「部署」。
 
 ## 从零走一遍完整流程
 
@@ -57,7 +57,145 @@ pnpm dev           # 开发模式，http://localhost:3000
 - `axiom.db`（含 `-wal` / `-shm`）：SQLite 数据库，启动时自动建目录、开启 WAL 与外键并执行迁移。
 - `uploads/<id>.<ext>`：上传的原始资料。
 
-备份就是复制这个目录。想推倒重来执行 `pnpm db:reset`（删除数据库文件后重新迁移），再 `pnpm db:seed` 写入种子数据。
+备份就是复制这个目录（服务运行时请用「部署」一节里的 `sqlite3 .backup`）。想推倒重来执行 `pnpm db:reset`（删除数据库文件后重新迁移），再 `pnpm db:seed` 写入种子数据。
+
+## 部署
+
+以下以 Ubuntu / Debian 为例，用 systemd 托管应用，Nginx 做 HTTPS 反向代理。相关配置文件在 `deploy/` 下：
+
+- `deploy/systemd/axiom.service`：systemd 服务。
+- `deploy/nginx/axiom.conf`：Nginx 站点配置（HTTPS、Basic Auth、上传与超时设置）。
+
+### 部署前必须知道
+
+- **应用本身没有账号系统**（ADR-0006 的前提是“本机单用户”），设置页里还保存着模型 API Key（明文）。所以不要把它直接暴露到公网，`deploy/nginx/axiom.conf` 默认用 HTTPS 加 Basic Auth 挡一层；如果只在固定 IP 使用，也可以改成 IP 白名单（配置里有注释示例）。
+- **只能跑一个实例**：数据存 SQLite，抽取任务在进程内排队。不要用多副本、负载均衡或 Node cluster。
+- **应用只监听 `127.0.0.1:3000`**，对外只开放 Nginx 的 80 / 443（例如 `sudo ufw allow 'Nginx Full'`）。
+- 数据库迁移在应用启动时自动执行（见「数据目录」），升级时不需要手动迁移。
+- 迁移文件按当前工作目录查找，所以服务必须在仓库根目录启动（`axiom.service` 已设置 `WorkingDirectory`）。
+
+### 1. 准备环境
+
+需要一个已解析到服务器的域名（下文用 `axiom.example.com`）。
+
+```bash
+sudo apt update
+sudo apt install -y nginx certbot apache2-utils sqlite3 git build-essential python3
+```
+
+- Node.js 22+ 请按官方方式安装，然后执行 `sudo corepack enable` 获得 pnpm 10。
+- `build-essential` 与 `python3` 用于在没有预编译包时编译原生模块 `better-sqlite3`。
+
+### 2. 获取代码并构建
+
+```bash
+sudo useradd --system --create-home --shell /usr/sbin/nologin axiom
+sudo install -d -o axiom -g axiom /opt/axiom /var/lib/axiom
+sudo -u axiom -H git clone <仓库地址> /opt/axiom
+```
+
+先写配置，再构建。构建阶段会加载服务端模块，可能顺带打开并迁移数据库，所以要让它落在数据目录里：
+
+```bash
+sudo -u axiom tee /opt/axiom/.env.local >/dev/null <<'EOF'
+AXIOM_DATA_DIR=/var/lib/axiom
+# 也可以不写下面三项，启动后在设置页填写
+AXIOM_LLM_BASE_URL=https://你的兼容端点/v1
+AXIOM_LLM_API_KEY=sk-xxxx
+AXIOM_LLM_MODEL=你的模型名
+EOF
+sudo chmod 600 /opt/axiom/.env.local
+
+sudo -u axiom -H bash -c 'cd /opt/axiom && pnpm install --frozen-lockfile && pnpm build'
+```
+
+`.env.local` 里有 API Key，权限保持 `600`。变量含义见「配置」。
+
+### 3. 用 systemd 托管
+
+```bash
+command -v node                       # 确认路径，不是 /usr/bin/node 就改 axiom.service 的 ExecStart
+sudo cp /opt/axiom/deploy/systemd/axiom.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now axiom
+curl -sI http://127.0.0.1:3000/ | head -1     # 应返回 HTTP/1.1 200
+```
+
+### 4. 配置 Nginx 与 HTTPS
+
+**a. 创建登录密码**（Basic Auth，把用户名换成你自己的）：
+
+```bash
+sudo htpasswd -c /etc/nginx/.axiom-htpasswd 你的用户名
+```
+
+**b. 申请证书。** 最终配置引用了尚不存在的证书文件，`nginx -t` 会失败，所以先放一个只处理证书校验的最小配置：
+
+```bash
+sudo mkdir -p /var/www/certbot
+sudo tee /etc/nginx/conf.d/axiom.conf >/dev/null <<'EOF'
+server {
+    listen 80;
+    server_name axiom.example.com;
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+}
+EOF
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot certonly --webroot -w /var/www/certbot -d axiom.example.com
+```
+
+**c. 换成完整配置：**
+
+```bash
+sudo cp /opt/axiom/deploy/nginx/axiom.conf /etc/nginx/conf.d/axiom.conf
+sudo sed -i 's/axiom\.example\.com/你的域名/g' /etc/nginx/conf.d/axiom.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+证书由 certbot 的定时任务自动续期，可用 `sudo certbot renew --dry-run` 检查。
+
+配置里与本应用相关的几处：
+
+| 设置 | 原因 |
+| --- | --- |
+| `client_max_body_size 55m` | 资料上传上限 50MB（`UPLOAD_MAX_BYTES`），multipart 会略大 |
+| `proxy_read_timeout 600s` | 对话回复与复盘在一次请求里等待模型返回，单次调用最长 180 秒（`LLM_TIMEOUT_MS`），含重试留足余量 |
+| `proxy_request_buffering off` | 大文件直接流给应用，不写 Nginx 临时文件 |
+| `auth_basic` | 应用没有登录，见上文 |
+
+### 5. 验证
+
+浏览器访问 `https://你的域名`，输入 Basic Auth 用户名密码后应看到首页；进设置页配置并“测试连接”，再上传一份小资料走一遍抽取。
+
+### 日常运维
+
+```bash
+# 查看日志
+sudo journalctl -u axiom -f
+sudo tail -f /var/log/nginx/error.log
+
+# 升级（先备份，见下）
+sudo -u axiom -H bash -c 'cd /opt/axiom && git pull && pnpm install --frozen-lockfile && pnpm build'
+sudo systemctl restart axiom
+
+# 备份（可放进 cron）：数据库用 .backup 保证一致，上传的原文直接复制
+BACKUP=/var/backups/axiom
+sudo install -d -o axiom -g axiom $BACKUP $BACKUP/uploads
+sudo -u axiom sqlite3 /var/lib/axiom/axiom.db ".backup '$BACKUP/axiom-$(date +%F).db'"
+sudo -u axiom cp -a /var/lib/axiom/uploads/. $BACKUP/uploads/
+```
+
+恢复：`sudo systemctl stop axiom`，把备份的数据库文件复制为 `/var/lib/axiom/axiom.db`（同时删掉旧的 `axiom.db-wal` / `axiom.db-shm`），上传目录复制回 `uploads/`，再 `sudo systemctl start axiom`。
+
+### 常见问题
+
+| 现象 | 排查 |
+| --- | --- |
+| 502 Bad Gateway | 应用没起来或端口不对：`systemctl status axiom`、`journalctl -u axiom` |
+| 上传大文件返回 413 | 检查 `client_max_body_size` 是否生效（`sudo nginx -T \| grep client_max_body_size`） |
+| 对话或复盘时 504 | 模型响应慢，调大 `proxy_read_timeout`；同时检查模型端点是否可达 |
+| `pnpm install` 编译 `better-sqlite3` 失败 | 确认已装 `build-essential` 与 `python3`，且 Node 版本 ≥ 22 |
+| 反复弹出登录框 | 检查密码文件路径与权限：`sudo nginx -T \| grep auth_basic_user_file` |
 
 ## Fake 模式（无 API Key 开发与测试）
 
