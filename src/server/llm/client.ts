@@ -58,12 +58,19 @@ export class OpenAICompatClient implements LLMClient {
 
   async complete(req: Parameters<LLMClient["complete"]>[0]): Promise<LLMCompletion> {
     const { supportsTemperature, supportsJsonMode } = this.config;
-    let response;
+    let text = "";
+    let finishReason: string | null = null;
+    let promptTokens: number | null = null;
+    let completionTokens: number | null = null;
     try {
-      response = await this.openai.chat.completions.create(
+      // 必须用流式：ModelScope 网关对耗时数分钟的非流式响应会丢掉响应体开头，
+      // 导致 SDK 的 response.json() 报 "is not valid JSON"。
+      const stream = await this.openai.chat.completions.create(
         {
           model: this.model,
           messages: req.messages,
+          stream: true,
+          stream_options: { include_usage: true },
           ...(supportsTemperature !== false ? { temperature: req.temperature } : {}),
           ...(req.json && supportsJsonMode === true
             ? { response_format: { type: "json_object" as const } }
@@ -71,16 +78,21 @@ export class OpenAICompatClient implements LLMClient {
         },
         { signal: req.signal },
       );
+      for await (const chunk of stream) {
+        const choice = chunk.choices[0];
+        text += choice?.delta?.content ?? "";
+        if (choice?.finish_reason) finishReason = choice.finish_reason;
+        if (chunk.usage) {
+          promptTokens = chunk.usage.prompt_tokens;
+          completionTokens = chunk.usage.completion_tokens;
+        }
+      }
     } catch (err) {
       if (req.signal?.aborted) throw err;
       throw this.toUnavailable(err);
     }
 
-    const choice = response.choices[0];
-    const text = choice?.message?.content ?? "";
-    const promptTokens = response.usage?.prompt_tokens ?? null;
-    const completionTokens = response.usage?.completion_tokens ?? null;
-    if (choice?.finish_reason === "length") {
+    if (finishReason === "length") {
       throw new LLMTruncatedError(text, promptTokens, completionTokens);
     }
     return { text, promptTokens, completionTokens };

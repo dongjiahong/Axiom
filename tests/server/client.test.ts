@@ -5,15 +5,24 @@ import { OpenAICompatClient, redactSecret } from "@/server/llm/client";
 
 const KEY = "test-key-abcdef123456";
 
-function completion(content: string, finishReason = "stop") {
-  return {
+/** 把内容拆成多块的 SSE 流，最后一块带 finish_reason 与 usage。 */
+function completion(content: string, finishReason = "stop", pieces: string[] = [content]) {
+  const chunk = (delta: Record<string, unknown>, finish: string | null, usage?: unknown) => ({
     id: "c1",
-    object: "chat.completion",
+    object: "chat.completion.chunk",
     created: 0,
     model: "m",
-    choices: [{ index: 0, finish_reason: finishReason, message: { role: "assistant", content } }],
-    usage: { prompt_tokens: 7, completion_tokens: 3, total_tokens: 10 },
-  };
+    choices: [{ index: 0, delta, finish_reason: finish }],
+    ...(usage ? { usage } : {}),
+  });
+  const events = [
+    chunk({ role: "assistant", reasoning_content: "先想一想" }, null),
+    ...pieces.map((piece) => chunk({ content: piece }, null)),
+    chunk({}, finishReason),
+    { ...chunk({}, null), choices: [], usage: { prompt_tokens: 7, completion_tokens: 3, total_tokens: 10 } },
+  ];
+  const body = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("") + "data: [DONE]\n\n";
+  return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -50,7 +59,7 @@ const req = { messages: [{ role: "user" as const, content: "你好" }], temperat
 
 describe("OpenAICompatClient", () => {
   it("返回文本与 token 用量；请求带模型名与 Authorization", async () => {
-    const stub = stubFetch(() => jsonResponse(completion("好")));
+    const stub = stubFetch(() => completion("好"));
     const res = await makeClient(stub.fn).complete(req);
     expect(res).toEqual({ text: "好", promptTokens: 7, completionTokens: 3 });
     expect(stub.bodies[0]).toMatchObject({ model: "model-a", messages: req.messages });
@@ -58,18 +67,25 @@ describe("OpenAICompatClient", () => {
     expect(stub.bodies[0]).not.toHaveProperty("max_tokens");
   });
 
+  it("用流式请求：拼接多块 content，忽略 reasoning_content", async () => {
+    const stub = stubFetch(() => completion("", "stop", ['{"a":', " 1", "}", "好"]));
+    const res = await makeClient(stub.fn).complete(req);
+    expect(res.text).toBe('{"a": 1}好');
+    expect(stub.bodies[0]).toMatchObject({ stream: true, stream_options: { include_usage: true } });
+  });
+
   it("temperature：仅在 supportsTemperature !== false 时发送", async () => {
-    const on = stubFetch(() => jsonResponse(completion("好")));
+    const on = stubFetch(() => completion("好"));
     await makeClient(on.fn, { supportsTemperature: null }).complete(req);
     expect(on.bodies[0].temperature).toBe(0.3);
 
-    const off = stubFetch(() => jsonResponse(completion("好")));
+    const off = stubFetch(() => completion("好"));
     await makeClient(off.fn, { supportsTemperature: false }).complete(req);
     expect(off.bodies[0]).not.toHaveProperty("temperature");
   });
 
   it("response_format：仅在 json 且 supportsJsonMode === true 时发送", async () => {
-    const known = stubFetch(() => jsonResponse(completion("{}")));
+    const known = stubFetch(() => completion("{}"));
     await makeClient(known.fn, { supportsJsonMode: true }).complete(req);
     expect(known.bodies[0].response_format).toEqual({ type: "json_object" });
 
@@ -78,14 +94,14 @@ describe("OpenAICompatClient", () => {
       [{ supportsJsonMode: false }, true],
       [{ supportsJsonMode: true }, false],
     ] as const) {
-      const stub = stubFetch(() => jsonResponse(completion("{}")));
+      const stub = stubFetch(() => completion("{}"));
       await makeClient(stub.fn, caps).complete({ ...req, json });
       expect(stub.bodies[0]).not.toHaveProperty("response_format");
     }
   });
 
   it("finish_reason=length 抛 LLMTruncatedError 并带上已有文本", async () => {
-    const stub = stubFetch(() => jsonResponse(completion('{"a": ', "length")));
+    const stub = stubFetch(() => completion('{"a": ', "length"));
     const err = await makeClient(stub.fn).complete(req).catch((e) => e);
     expect(err).toBeInstanceOf(LLMTruncatedError);
     expect(err).toMatchObject({ text: '{"a": ', promptTokens: 7, completionTokens: 3 });
@@ -129,7 +145,7 @@ describe("OpenAICompatClient", () => {
   }, 20000);
 
   it("signal 已中止时原样抛出中止错误，而不是 LLMUnavailableError", async () => {
-    const stub = stubFetch(() => jsonResponse(completion("好")));
+    const stub = stubFetch(() => completion("好"));
     const err = await makeClient(stub.fn)
       .complete({ ...req, signal: AbortSignal.abort() })
       .catch((e) => e);
