@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { UPLOAD_MAX_BYTES } from "@/domain/constants";
@@ -13,6 +14,7 @@ import {
   getChunkText,
   getSourceDetail,
   listSources,
+  setAllChunksSkipped,
   setChunkSkipped,
   uploadSource,
 } from "@/server/services/sources";
@@ -195,6 +197,72 @@ describe("setChunkSkipped", () => {
     const chunkId = detail.chunks[0].id;
     test.db.update(sourceChunks).set({ extractionStatus: "done" }).where(eq(sourceChunks.id, chunkId)).run();
     expect(() => setChunkSkipped(detail.id, chunkId, true, test.db)).toThrow("该章节已经开始抽取");
+  });
+});
+
+describe("setAllChunksSkipped", () => {
+  /** 在已上传的资料上追加一个待抽取章节块与一个已抽取完成的章节块。 */
+  async function uploadWithMixedChunks() {
+    const detail = await upload("sample.md");
+    const now = Date.now();
+    test.db
+      .insert(sourceChunks)
+      .values([
+        {
+          id: nanoid(),
+          sourceId: detail.id,
+          seq: 2,
+          title: "待抽取章节",
+          text: "内容",
+          charCount: 2,
+          extractionStatus: "pending",
+          extractionError: null,
+          extractedAt: null,
+        },
+        {
+          id: nanoid(),
+          sourceId: detail.id,
+          seq: 3,
+          title: "已完成章节",
+          text: "内容",
+          charCount: 2,
+          extractionStatus: "done",
+          extractionError: null,
+          extractedAt: now,
+        },
+      ])
+      .run();
+    return detail;
+  }
+
+  function statusesOf(sourceId: string) {
+    return test.db
+      .select()
+      .from(sourceChunks)
+      .where(eq(sourceChunks.sourceId, sourceId))
+      .orderBy(sourceChunks.seq)
+      .all()
+      .map((chunk) => chunk.extractionStatus);
+  }
+
+  it("全部跳过与全部恢复，已抽取完成的章节保持原状", async () => {
+    const detail = await uploadWithMixedChunks();
+
+    expect(setAllChunksSkipped(detail.id, true, test.db)).toEqual({ updated: 2, locked: 1 });
+    expect(statusesOf(detail.id)).toEqual(["skipped", "skipped", "done"]);
+
+    expect(setAllChunksSkipped(detail.id, false, test.db)).toEqual({ updated: 2, locked: 1 });
+    expect(statusesOf(detail.id)).toEqual(["pending", "pending", "done"]);
+  });
+
+  it("重复执行时没有可改动的章节，只有已抽取完成的章节计入 locked", async () => {
+    const detail = await uploadWithMixedChunks();
+    setAllChunksSkipped(detail.id, true, test.db);
+    expect(setAllChunksSkipped(detail.id, true, test.db)).toEqual({ updated: 0, locked: 1 });
+  });
+
+  it("资料不存在返回 404", () => {
+    expect(() => setAllChunksSkipped("nope", true, test.db)).toThrow(ApiError);
   });
 });
 

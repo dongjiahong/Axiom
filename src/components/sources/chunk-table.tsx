@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { SourceChunkSummaryDto } from "@/server/dto/source";
+import type { SourceChunkSummaryDto, SourceChunksBulkSkipDto } from "@/server/dto/source";
 
 import { CHUNK_STATUS_LABELS, formatCharCount } from "./labels";
 
@@ -36,8 +36,13 @@ export function ChunkTable({
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [opened, setOpened] = useState<{ title: string; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const pendingChunks = chunks.filter((chunk) => chunk.extractionStatus === "pending");
+  const skippedChunks = chunks.filter((chunk) => chunk.extractionStatus === "skipped");
+  const notSkippedCount = chunks.filter((chunk) => chunk.extractionStatus !== "skipped").length;
 
   async function toggleSkipped(chunk: SourceChunkSummaryDto, skipped: boolean) {
     setPending(chunk.id);
@@ -54,6 +59,34 @@ export function ChunkTable({
       toast.error(err instanceof Error ? err.message : "操作失败");
     } finally {
       setPending(null);
+    }
+  }
+
+  async function toggleAll(skipped: boolean) {
+    setBulkBusy(true);
+    try {
+      const res = await fetch(`/api/sources/${sourceId}/chunks`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skipped }),
+      });
+      const data: SourceChunksBulkSkipDto & { error?: { message: string } } = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message ?? "操作失败");
+      const lockedHint = data.locked > 0 ? `，${data.locked} 个已开始抽取的章节未改动` : "";
+      if (data.updated === 0) {
+        toast.message(`没有可改动的章节${lockedHint}`);
+      } else {
+        toast.success(
+          skipped
+            ? `已跳过 ${data.updated} 个章节${lockedHint}`
+            : `已恢复 ${data.updated} 个章节参与抽取${lockedHint}`,
+        );
+      }
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "操作失败");
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -85,6 +118,7 @@ export function ChunkTable({
     <Switch
       checked={chunk.extractionStatus === "skipped"}
       disabled={
+        bulkBusy ||
         pending === chunk.id ||
         (chunk.extractionStatus !== "skipped" && chunk.extractionStatus !== "pending")
       }
@@ -93,8 +127,36 @@ export function ChunkTable({
     />
   );
 
+  const toolbar = (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b p-3">
+      <p className="text-muted-foreground text-xs">
+        已选 {notSkippedCount}/{chunks.length} 个章节参与抽取
+      </p>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={bulkBusy || skippedChunks.length === 0}
+          onClick={() => void toggleAll(false)}
+        >
+          全选
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={bulkBusy || pendingChunks.length === 0}
+          onClick={() => void toggleAll(true)}
+        >
+          全不选
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <>
+      {toolbar}
+
       <ul className="divide-y rounded-lg border md:hidden">
         {chunks.map((chunk) => (
           <li key={chunk.id} className="space-y-2 p-3 text-sm">

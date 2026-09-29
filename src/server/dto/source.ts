@@ -57,3 +57,9 @@ export interface SourceChunkTextDto {
   title: string;
   text: string;
 }
+
+/** 批量跳过 / 取消跳过的结果：locked 为已开始抽取、无法改动的章节块数。 */
+export interface SourceChunksBulkSkipDto {
+  updated: number;
+  locked: number;
+}

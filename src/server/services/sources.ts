@@ -9,6 +9,7 @@ import { db, type AppDatabase } from "@/server/db/client";
 import { jobs, methodologies, sourceChunks, sources } from "@/server/db/schema";
 import type {
   SourceChunkTextDto,
+  SourceChunksBulkSkipDto,
   SourceDetailDto,
   SourceListItemDto,
 } from "@/server/dto/source";
@@ -268,6 +269,36 @@ export function setChunkSkipped(
     .where(eq(sourceChunks.id, chunkId))
     .run();
   return chunk;
+}
+
+/**
+ * 批量跳过 / 取消跳过：只改动尚未抽取（skipped 或 pending）的章节块，
+ * 已开始抽取的保持原状，避免覆盖抽取进度。
+ */
+export function setAllChunksSkipped(
+  sourceId: string,
+  skipped: boolean,
+  database: AppDatabase = db,
+): SourceChunksBulkSkipDto {
+  getSource(sourceId, database);
+  const rows = database
+    .select({ id: sourceChunks.id, extractionStatus: sourceChunks.extractionStatus })
+    .from(sourceChunks)
+    .where(eq(sourceChunks.sourceId, sourceId))
+    .all();
+  const target = skipped ? "skipped" : "pending";
+  const changeable = rows.filter(
+    (row) => row.extractionStatus === "skipped" || row.extractionStatus === "pending",
+  );
+  const ids = changeable.filter((row) => row.extractionStatus !== target).map((row) => row.id);
+  if (ids.length > 0) {
+    database
+      .update(sourceChunks)
+      .set({ extractionStatus: target })
+      .where(inArray(sourceChunks.id, ids))
+      .run();
+  }
+  return { updated: ids.length, locked: rows.length - changeable.length };
 }
 
 /** 删除资料、章节块、上传文件与它的 draft；confirmed/archived 保留（sourceId 置空）。 */

@@ -15,6 +15,7 @@ import {
 } from "@/server/db/schema";
 import { countBodyMarks } from "@/server/dto/extraction";
 import type {
+  BulkStatusResultDto,
   MethodologyBodyInput,
   MethodologyDetailDto,
   MethodologyListItemDto,
@@ -317,6 +318,29 @@ export function changeMethodologyStatus(
     }
   });
   return getMethodology(id, database);
+}
+
+/** 批量迁移状态：逐个执行，失败的收集原因返回，不影响其余成功的方法论。 */
+export function changeMethodologiesStatus(
+  ids: string[],
+  action: StatusAction,
+  database: AppDatabase = db,
+): BulkStatusResultDto {
+  const succeeded: string[] = [];
+  const failed: BulkStatusResultDto["failed"] = [];
+  for (const id of [...new Set(ids)]) {
+    try {
+      changeMethodologyStatus(id, action, database);
+      succeeded.push(id);
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err;
+      failed.push({
+        id,
+        message: err.issues?.length ? `有 ${err.issues.length} 个问题待修正` : err.message,
+      });
+    }
+  }
+  return { succeeded, failed };
 }
 
 // ───────────── 拆分 ─────────────

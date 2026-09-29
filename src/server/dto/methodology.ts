@@ -102,3 +102,14 @@ export type SaveMethodologyInput = z.infer<typeof SaveMethodologyInput>;
 export const SplitInput = z.object({ stepIds: z.array(z.string()).min(1, "请至少选择 1 个步骤") });
 
 export const MergeMethodologiesInput = z.object({ ids: z.array(z.string()).min(2, "至少需要选择 2 个候选方法论") });
+
+export const BulkStatusInput = z.object({
+  ids: z.array(z.string().min(1)).min(1, "请至少选择 1 个方法论"),
+  action: z.enum(["confirm", "unconfirm", "archive", "restore"]),
+});
+
+/** 批量状态迁移的结果：失败的逐条返回原因，其余照常生效。 */
+export interface BulkStatusResultDto {
+  succeeded: string[];
+  failed: { id: string; message: string }[];
+}

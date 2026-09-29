@@ -17,6 +17,7 @@ import { ApiError } from "@/server/http";
 import { listMergeSuggestions } from "@/server/services/extraction";
 import {
   acceptMergeSuggestion,
+  changeMethodologiesStatus,
   changeMethodologyStatus,
   collectConfirmIssues,
   createBlankMethodology,
@@ -226,6 +227,50 @@ describe("状态迁移", () => {
     expect(issues.map((i) => i.path)).toEqual(
       expect.arrayContaining(["steps[0].title", "steps[0].keyPoints[0].text"]),
     );
+  });
+});
+
+describe("批量状态迁移", () => {
+  it("逐个迁移：成功的生效，失败的返回原因", () => {
+    const ok = addMethodology({ name: "完备" });
+    const invalid = addMethodology({
+      name: "缺适用条件",
+      body: makeMethodologyBody({ applicability: [] }),
+    });
+
+    const result = changeMethodologiesStatus([ok, invalid, "nope"], "confirm", test.db);
+
+    expect(result.succeeded).toEqual([ok]);
+    expect(result.failed.map((failure) => failure.id)).toEqual([invalid, "nope"]);
+    expect(result.failed[0].message).toBe("有 1 个问题待修正");
+    expect(result.failed[1].message).toBe("方法论不存在");
+    expect(statusOf(ok)).toBe("confirmed");
+    expect(statusOf(invalid)).toBe("draft");
+  });
+
+  it("重复 id 只处理一次；归档与恢复可用", () => {
+    const draft = addMethodology();
+    const confirmed = addMethodology({ status: "confirmed" });
+
+    expect(changeMethodologiesStatus([draft, draft, confirmed], "archive", test.db).succeeded).toEqual([
+      draft,
+      confirmed,
+    ]);
+    expect(statusOf(draft)).toBe("archived");
+    expect(statusOf(confirmed)).toBe("archived");
+
+    expect(changeMethodologiesStatus([draft], "restore", test.db).succeeded).toEqual([draft]);
+    expect(statusOf(draft)).toBe("draft");
+  });
+
+  it("当前状态不允许的动作全部失败，返回 409 的中文原因", () => {
+    const archived = addMethodology({ status: "archived" });
+    const result = changeMethodologiesStatus([archived], "unconfirm", test.db);
+    expect(result.succeeded).toEqual([]);
+    expect(result.failed).toEqual([
+      { id: archived, message: "只有已确认的方法论可以退回候选" },
+    ]);
+    expect(statusOf(archived)).toBe("archived");
   });
 });
 
