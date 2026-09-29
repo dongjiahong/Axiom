@@ -146,3 +146,9 @@ export const STATS_RECENT_WINDOW = 5;
 
 /** 首页「最需要练习」列出的方法论数量（api-and-ui.md §4.1）。 */
 export const HOME_WEAKEST_COUNT = 3;
+
+/** 首页「最近练习」列出的场数（api-and-ui.md §4.1）。 */
+export const HOME_RECENT_SESSIONS = 5;
+
+/** 历史页每页显示的练习场数（api-and-ui.md §4.10）。 */
+export const HISTORY_PAGE_SIZE = 20;

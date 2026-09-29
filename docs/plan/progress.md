@@ -502,3 +502,54 @@ pnpm build        # 通过；/api/stats/{overview,confusion,difficulty} 与 /sta
 - `algorithms.md` §9 补充：§9.1 列出哪些方法论、§9.2 混淆行的筛选口径、§9.3 按方法论表格的集合与 `largestGap` 参与条件、新增 §9.4 首页「最需要练习」的口径。
 - 服务层新增 `services/stats.ts`（`getStatsOverview` / `getStatsConfusion` / `getStatsDifficulty` / `listWeakestMethodologies`），接受 `{ database?, now? }` 供测试注入；`now` 仅用于掌握度的时间衰减。
 - 未改动任何既有表结构、既有 schemas 或既有接口。
+
+## WP10 · 首页、历史、重练、E2E、打磨
+
+### 完成内容
+
+1. **历史列表（`GET /api/sessions`）**：`services/practice.ts` 新增 `listSessions(query, database?)`，`practice_sessions ⨝ scenarios ⟕ debriefs` 按创建时间倒序，返回 `SessionListDto`（`{ items, page, pageSize, total }`）。单条记录含时间、场景标题、模式、难度、状态、执行分、识别、说服结果与所用方法论名称；综合测验在复盘前 `methodologyName = null`（页面显示"—"）。DTO 与查询入参 schema 在 `src/server/dto/session.ts`（`SessionListItemDto` / `SessionListDto` / `SessionListQuery`）。
+2. **重练（`POST /api/scenarios/[id]/retry`）**：`services/practice.ts` 新增 `retryScenario(scenarioId, mode?, database?)`，用同一场景新建一场 `briefing` 练习（drill 时 `selectedMethodologyId = 场景目标`，quiz 时为空、候选取自场景）；`mode` 省略时沿用该场景上一次练习的模式（没有历史时默认 drill）；场景不存在返回 404。body 可省略（新增 `parseOptionalJson`，空 body 视为 `{}`）。
+3. **首页 `/`**（`src/app/page.tsx`）：未配置 AI 的横幅、两个快捷入口（专项练习 / 综合测验 → `/practice/new?mode=...`）、“最需要练习”（沿用 WP9）、“最近练习”（`HOME_RECENT_SESSIONS` = 5 场）与“查看全部历史”链接；各部分都有自己的空状态引导。
+4. **历史页 `/history`**（`src/app/history/page.tsx` + `components/history/sessions-table.tsx`）：服务端读取 `listSessions({ page })`，客户端表格展示时间、场景、模式、难度、所用方法论、执行分、识别、说服结果、状态；操作列“查看复盘 / 去复盘 / 继续”链接与“再练一次”按钮；超过一页时提供上一页 / 下一页（`?page=`）。空状态引导去新建练习。
+5. **复盘页底部操作**（`components/practice/practice-actions.tsx`）：“再练一次”（`POST /api/scenarios/[id]/retry`，沿用原模式）、“换个场景练同一方法论”（`POST /api/practice`，drill + pick + 刚练过的方法论与原难度）、“开始新的练习”、“返回首页”。
+6. **全局打磨**：新增 `src/app/loading.tsx`（路由切换的骨架屏，覆盖全站）；`sonner` 错误提示与未保存修改提示沿用 WP2/WP5 已有实现（本轮未改）。
+7. **`README.md`**（新增）：安装、配置（环境变量表 + 设置页）、启动、从零走一遍完整流程、数据目录、Fake 模式、命令表、文档索引。
+8. **Playwright E2E**（`tests/e2e/practice-flow.spec.ts`，`AXIOM_FAKE_LLM=1`）：
+   - 专项练习全流程：上传 `tests/fixtures/sample-gbk.txt` → 开始抽取 → 等待候选方法论 → 改名并确认入库 → 新建专项练习（指定）→ 查看方法论骨架 → 发 2 条消息 → 结束 → 复盘页显示执行分 → 改判一条要点 → 统计页该方法论专项场数为 1。
+   - 综合测验全流程：设置范围 → 生成场景 → 在候选中选择方法论 → 对话 → 结束 → 复盘页显示识别结果（你选择的 / 目标方法论 / 场景设计说明 / 识别徽章）。
+9. **测试**：`tests/server/history.test.ts`（7 个用例）：空库、倒序与分页、drill 显示目标名称 / quiz 复盘前不显示、复盘后带出所用方法论与执行分 / 识别 / 说服结果、重练沿用模式与显式覆盖模式、未知场景 404。
+
+### 验证方式
+
+```
+pnpm lint         # 通过
+pnpm typecheck    # 通过
+pnpm test         # 34 个文件 / 449 个用例通过（新增 1 个文件 / 7 个用例）
+pnpm e2e          # 2 个用例通过（连续 3 次运行均通过，约 24 秒）
+pnpm build        # 通过
+```
+
+`pnpm e2e` 的 `webServer` 每次运行前执行 `pnpm db:reset && pnpm db:seed`（独立 `AXIOM_DATA_DIR=./data/e2e`），因此端到端测试从零开始、可重复；`baseURL` 用 `http://localhost:3100`（与 dev server 同源，避免 Next 16 拦截 `127.0.0.1` 的 dev 资源与 HMR 导致页面不水合）。
+
+### 已知限制
+
+- **未用真实模型跑 E2E**：两条端到端用例都在 `AXIOM_FAKE_LLM=1` 下运行；真实模型下的场景质量、对方表演与复盘判定仍需人工试几场（WP4/WP6/WP7/WP8 的遗留项）。
+- **Next 16 的 dev server 锁**：同一项目目录同时只能有一个 `next dev`。若本地已经开着 `pnpm dev`，`pnpm e2e` 会因 Playwright 无法再起一个 dev server 而失败（Playwright 的 `reuseExistingServer: false`）。本次验证前停掉了环境里遗留的 `next dev` / `next start` 进程；这不是 WP10 引入的行为（WP0 的配置同样如此）。
+- **`reuseExistingServer: false` + 每次 `db:reset`**：会清空 `data/e2e`；若你手动在 3100 上跑着服务，`pnpm e2e` 会直接报错而不是复用。
+- E2E 用例依赖 Fake 数据的确定性（对方回复不含“谢谢”以避免提前结束、第一条消息 ≥10 字以便证据核对通过）；真实模型下这些断言不适用。
+- 历史页一次读取全部已结束/进行中的练习再在内存分页（`listSessions` 先全量查询再切片），练习量很大时应改为 SQL 分页。
+- 首页“最近练习”与历史页共用同一个 `SessionsTable`/`RecentSessions` 组件，但首页只显示最近 5 场、不带分页与“再练一次”。
+- 历史列表的“时间”列取练习的创建时间（不是结束时间）；计划未明确。
+- “换个场景练同一方法论”固定用上一场练习的难度与原方法论，生成失败（方法论已归档、未配置模型等）时用 toast 提示。
+- 全局加载态只有一个根级 `loading.tsx` 骨架屏，没有为每个页面单独定制。
+
+### 对公共契约的改动
+
+均为向后兼容的新增，已同步 `docs/plan/`：
+
+- 新增 `GET /api/sessions`（`?page&pageSize`，返回 `{ items, page, pageSize, total }`）与 `POST /api/scenarios/[id]/retry`（body `{ mode? }` 可省略），与 `api-and-ui.md` §3 已有的接口清单一致，补充了分页与 mode 默认值语义（`api-and-ui.md` §3、§4.1、§4.10）。
+- `src/server/dto/session.ts` 新增 `SessionListItemDto` / `SessionListDto` / `SessionListQuery` / `RetryScenarioInput`；`src/server/http.ts` 新增 `parseOptionalJson`（空 body 视为 `{}`，供可省略入参使用）。
+- `src/domain/constants.ts` 与 `README.md` §6 新增 `HOME_RECENT_SESSIONS`（5）、`HISTORY_PAGE_SIZE`（20）。
+- `playwright.config.ts`：`baseURL` / `url` 由 `127.0.0.1` 改为 `localhost`；`webServer.command` 改为 `pnpm db:reset && pnpm db:seed && pnpm dev --port 3100`，`reuseExistingServer` 固定为 `false`，并设置 test/expect 超时。
+- 未改动任何表结构、既有 schemas 或既有接口的语义。
+

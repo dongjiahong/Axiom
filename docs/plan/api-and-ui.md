@@ -135,7 +135,7 @@ POST /api/practice ──▶ briefing ──start──▶ active ──(用户�
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | `/api/practice` | `{ mode, selection: 'pick' \| 'random', methodologyId?, scope: Scope, difficulty }` → `{ sessionId }` |
-| GET | `/api/sessions` | 历史列表：时间、场景标题、模式、难度、状态、执行分、识别结果、说服结果；分页 |
+| GET | `/api/sessions` | 历史列表：时间、场景标题、模式、难度、状态、执行分、识别结果、说服结果；`?page&pageSize`（默认 1 / `HISTORY_PAGE_SIZE`），按创建时间倒序，返回 `{ items, page, pageSize, total }`。综合测验在复盘前不下发所用方法论名称（页面显示"—"） |
 | GET | `/api/sessions/[id]` | 会话 DTO（严格遵守 `data-model.md` §4） |
 | POST | `/api/sessions/[id]/select` | quiz 选择方法论 |
 | POST | `/api/sessions/[id]/start` | 开始 |
@@ -147,7 +147,7 @@ POST /api/practice ──▶ briefing ──start──▶ active ──(用户�
 | GET | `/api/sessions/[id]/debrief` | 复盘 DTO：识别、执行分与明细、整体印象分、说服结果、总结、按步骤分组的要点判定、原则判定、完整对话、目标/所选方法论快照、场景隐藏字段 |
 | PUT | `/api/verdicts/[id]/override` | `{ verdict, quality: number \| null, reason: string (必填) }`；质量分规则同 `algorithms.md` §5.1（不合规 400）→ 返回 `{ verdict: VerdictDto, executionScore, scoreBreakdown }` |
 | DELETE | `/api/verdicts/[id]/override` | 撤销改判（没有改判时 409），返回同上 |
-| POST | `/api/scenarios/[id]/retry` | 重练 |
+| POST | `/api/scenarios/[id]/retry` | 重练：以同一场景新建一场 briefing 练习，返回 `{ sessionId }`；body 可省略，`{ mode? }` 指定模式，省略时沿用该场景上一次练习的模式（无历史时默认 drill）；场景不存在 404 |
 
 ### 统计
 
@@ -166,7 +166,7 @@ POST /api/practice ──▶ briefing ──start──▶ active ──(用户�
 - 未配置 AI 时顶部横幅引导去设置页。
 - 两个快捷入口："专项练习"、"综合测验"（跳到 `/practice/new?mode=...`）。
 - "最需要练习"：掌握度最低的 3 个方法论，每个带"专项练习"按钮（pick 模式直接创建）。
-- 最近 5 场练习。
+- 最近 5 场练习（`HOME_RECENT_SESSIONS`）：时间、场景标题、模式、难度、执行分、状态；"查看全部历史"跳到 `/history`。
 
 ### 4.2 设置 `/settings`
 
@@ -250,7 +250,7 @@ POST /api/practice ──▶ briefing ──start──▶ active ──(用户�
 
 ### 4.10 历史 `/history`
 
-表格：时间、场景标题、模式、难度、所用方法论（quiz 复盘前显示"—"）、执行分、识别、说服结果、状态。操作：查看复盘 / 继续（未结束的会话）/ 再练一次。
+表格：时间、场景标题、模式、难度、所用方法论（quiz 复盘前显示"—"）、执行分、识别、说服结果、状态。操作：查看复盘 / 继续（未结束的会话）/ 再练一次。按创建时间倒序分页，每页 `HISTORY_PAGE_SIZE` 场，`?page=` 指定页码。
 
 ### 4.11 统计 `/stats`
 

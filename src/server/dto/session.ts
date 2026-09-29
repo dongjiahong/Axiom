@@ -4,6 +4,7 @@ import { MESSAGE_MAX_CHARS } from "@/domain/constants";
 import {
   Difficulty,
   PracticeMode,
+  Recognition,
   Scope,
   SelectionMode,
   type CounterpartBrief,
@@ -11,6 +12,7 @@ import {
   type MessageMeta,
   type MethodologyBody,
   type MethodologySnapshot,
+  type Outcome,
 } from "@/domain/schemas";
 import type { MessageRole, SessionStatus } from "@/server/db/schema";
 
@@ -30,6 +32,17 @@ export const CreatePracticeInput = z.object({
 export type CreatePracticeInput = z.infer<typeof CreatePracticeInput>;
 
 export const SelectMethodologyInput = z.object({ methodologyId: z.string().min(1) });
+
+/** 重练同一场景：可选指定模式，省略时沿用该场景上一次练习的模式。 */
+export const RetryScenarioInput = z.object({ mode: PracticeMode.optional() });
+export type RetryScenarioInput = z.infer<typeof RetryScenarioInput>;
+
+/** 历史列表的分页参数。 */
+export const SessionListQuery = z.object({
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
+});
+export type SessionListQuery = z.infer<typeof SessionListQuery>;
 
 export const SendMessageInput = z.object({
   content: z
@@ -108,6 +121,30 @@ export interface CandidateDto {
   id: string;
   name: string;
   tags: string[];
+}
+
+/** 历史列表 / 首页「最近练习」的单条记录（api-and-ui.md §4.10）。 */
+export interface SessionListItemDto {
+  id: string;
+  scenarioId: string;
+  scenarioTitle: string;
+  mode: PracticeMode;
+  difficulty: Difficulty;
+  status: SessionStatus;
+  createdAt: number;
+  endedAt: number | null;
+  /** 所用方法论名称；综合测验在复盘前不下发（页面显示"—"，避免暴露信息）。 */
+  methodologyName: string | null;
+  executionScore: number | null;
+  recognition: Recognition | null;
+  outcome: Outcome | null;
+}
+
+export interface SessionListDto {
+  items: SessionListItemDto[];
+  page: number;
+  pageSize: number;
+  total: number;
 }
 
 export interface SessionDto {

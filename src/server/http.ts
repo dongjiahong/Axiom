@@ -73,6 +73,23 @@ export async function parseJson<T>(req: Request, schema: z.ZodType<T>): Promise<
   } catch {
     throw new ApiError(400, "invalid_input", "请求体不是合法的 JSON");
   }
+  return parseValue(raw, schema);
+}
+
+/** 解析可省略的 JSON 请求体：空 body 视为 `{}`（用于 `{ mode? }` 这类入参）。 */
+export async function parseOptionalJson<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
+  const text = await req.text();
+  if (text.trim() === "") return parseValue({}, schema);
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new ApiError(400, "invalid_input", "请求体不是合法的 JSON");
+  }
+  return parseValue(raw, schema);
+}
+
+function parseValue<T>(raw: unknown, schema: z.ZodType<T>): T {
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {
     throw new ApiError(400, "invalid_input", `入参不合法：${zodErrorToMessages(parsed.error).join("；")}`);

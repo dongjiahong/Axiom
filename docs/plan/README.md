@@ -187,6 +187,8 @@ src/server/jobs/*     ← 进程内任务队列（抽取）
 | `STATS_TREND_LIMIT` | 30 | 统计概览中执行分趋势保留的最近场数 |
 | `STATS_RECENT_WINDOW` | 5 | 统计概览中「最近 N 场」执行分均值取的场数 |
 | `HOME_WEAKEST_COUNT` | 3 | 首页「最需要练习」列出的方法论数量 |
+| `HOME_RECENT_SESSIONS` | 5 | 首页「最近练习」列出的场数 |
+| `HISTORY_PAGE_SIZE` | 20 | 历史页每页显示的练习场数 |
 
 ## 7. 工作包与依赖
 

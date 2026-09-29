@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { requestJson } from "@/components/methodology/labels";
 import { DIFFICULTY_LABELS, MODE_LABELS } from "@/components/practice/labels";
+import { RetryButton, SwitchMethodologyButton } from "@/components/practice/practice-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -272,8 +273,13 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
             </section>
           ) : null}
 
-          <div className="flex gap-2">
-            <Button asChild>
+          <div className="flex flex-wrap gap-2">
+            <RetryButton scenarioId={dto.session.scenario.id} variant="default" />
+            <SwitchMethodologyButton
+              methodologyId={dto.selected.methodologyId}
+              difficulty={dto.difficulty}
+            />
+            <Button asChild variant="outline">
               <Link href="/practice/new">开始新的练习</Link>
             </Button>
             <Button asChild variant="outline">

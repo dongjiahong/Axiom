@@ -1,15 +1,23 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
-import type { EndReason, MessageMeta, MethodologySnapshot } from "@/domain/schemas";
+import { HISTORY_PAGE_SIZE } from "@/domain/constants";
+import type {
+  EndReason,
+  MessageMeta,
+  MethodologySnapshot,
+  PracticeMode,
+} from "@/domain/schemas";
 import { db, type AppDatabase } from "@/server/db/client";
 import {
+  debriefs,
   messages,
   methodologies,
   practiceSessions,
   scenarios,
 } from "@/server/db/schema";
 import {
+  isRevealed,
   SendMessageInput,
   toMessageDto,
   toSessionDto,
@@ -18,6 +26,7 @@ import {
   type MessageResultDto,
   type MethodologySkeletonDto,
   type SessionDto,
+  type SessionListDto,
 } from "@/server/dto/session";
 import { tagNamesByMethodology } from "@/server/extraction/drafts";
 import { ApiError } from "@/server/http";
@@ -424,4 +433,118 @@ export function endSession(
     .where(eq(practiceSessions.id, id))
     .run();
   return getSession(id, database);
+}
+
+// ───────────── 历史与重练 ─────────────
+
+/** 历史列表（api-and-ui.md §4.10）：按创建时间倒序分页。 */
+export function listSessions(
+  query: { page?: number; pageSize?: number } = {},
+  database: AppDatabase = db,
+): SessionListDto {
+  const page = query.page ?? 1;
+  const pageSize = query.pageSize ?? HISTORY_PAGE_SIZE;
+
+  const rows = database
+    .select({
+      id: practiceSessions.id,
+      scenarioId: practiceSessions.scenarioId,
+      mode: practiceSessions.mode,
+      status: practiceSessions.status,
+      selectedMethodologyId: practiceSessions.selectedMethodologyId,
+      createdAt: practiceSessions.createdAt,
+      endedAt: practiceSessions.endedAt,
+      scenarioTitle: scenarios.title,
+      targetMethodologyId: scenarios.targetMethodologyId,
+      difficulty: scenarios.difficulty,
+      executionScore: debriefs.executionScore,
+      recognition: debriefs.recognition,
+      outcome: debriefs.outcome,
+    })
+    .from(practiceSessions)
+    .innerJoin(scenarios, eq(scenarios.id, practiceSessions.scenarioId))
+    .leftJoin(debriefs, eq(debriefs.sessionId, practiceSessions.id))
+    .orderBy(desc(practiceSessions.createdAt), desc(practiceSessions.id))
+    .all();
+
+  const ids = [
+    ...new Set(
+      rows
+        .flatMap((row) => [row.targetMethodologyId, row.selectedMethodologyId])
+        .filter((id): id is string => id !== null),
+    ),
+  ];
+  const names = new Map(
+    (
+      ids.length === 0
+        ? []
+        : database
+            .select({ id: methodologies.id, name: methodologies.name })
+            .from(methodologies)
+            .where(inArray(methodologies.id, ids))
+            .all()
+    ).map((row) => [row.id, row.name]),
+  );
+
+  const start = (page - 1) * pageSize;
+  return {
+    items: rows.slice(start, start + pageSize).map((row) => ({
+      id: row.id,
+      scenarioId: row.scenarioId,
+      scenarioTitle: row.scenarioTitle,
+      mode: row.mode,
+      difficulty: row.difficulty,
+      status: row.status,
+      createdAt: row.createdAt,
+      endedAt: row.endedAt,
+      // 综合测验在复盘前不显示所用方法论，避免与目标方法论混在一起
+      methodologyName:
+        row.mode === "drill"
+          ? (names.get(row.targetMethodologyId) ?? "")
+          : isRevealed(row.status) && row.selectedMethodologyId
+            ? (names.get(row.selectedMethodologyId) ?? null)
+            : null,
+      executionScore: row.executionScore ?? null,
+      recognition: row.recognition ?? null,
+      outcome: row.outcome ?? null,
+    })),
+    page,
+    pageSize,
+    total: rows.length,
+  };
+}
+
+/** 重练：以同一场景新建一场 briefing 练习，模式默认沿用该场景上一次练习的模式。 */
+export function retryScenario(
+  scenarioId: string,
+  mode?: PracticeMode,
+  database: AppDatabase = db,
+): { sessionId: string } {
+  const scenario = database.select().from(scenarios).where(eq(scenarios.id, scenarioId)).get();
+  if (!scenario) throw new ApiError(404, "not_found", "场景不存在");
+
+  const previous = database
+    .select({ mode: practiceSessions.mode })
+    .from(practiceSessions)
+    .where(eq(practiceSessions.scenarioId, scenarioId))
+    .orderBy(desc(practiceSessions.createdAt), desc(practiceSessions.id))
+    .limit(1)
+    .get();
+  const nextMode: PracticeMode = mode ?? previous?.mode ?? "drill";
+
+  const sessionId = nanoid();
+  database
+    .insert(practiceSessions)
+    .values({
+      id: sessionId,
+      scenarioId,
+      mode: nextMode,
+      status: "briefing",
+      selectedMethodologyId: nextMode === "drill" ? scenario.targetMethodologyId : null,
+      hintUsed: false,
+      maxTurns: getPracticeSettings(database).maxTurns,
+      createdAt: Date.now(),
+    })
+    .run();
+  return { sessionId };
 }
