@@ -165,6 +165,13 @@ src/server/jobs/*     ← 进程内任务队列（抽取）
 | `LLM_TIMEOUT_MS` / `LLM_TRANSPORT_RETRIES` / `LLM_JSON_ATTEMPTS` | 180000 / 3 / 3 | AI 调用 |
 | `LLM_LOG_MAX_CHARS` | 200000 | llm_calls 中请求/响应文本的最大保留字符数 |
 | `MAX_TURNS_MIN` / `MAX_TURNS_MAX` | 4 / 30 | 设置页轮数上限的允许范围 |
+| `UPLOAD_MAX_BYTES` | 52428800 | 资料上传的文件大小上限（50MB） |
+| `PDF_MIN_CHARS_PER_PAGE` | 50 | 判定扫描版 PDF 的平均每页有效字符下限 |
+| `PDF_HEADER_FOOTER_PAGE_RATIO` | 0.5 | 判定页眉/页脚时同一行文本需出现的页面比例 |
+| `TOKEN_ESTIMATE_PER_CHAR` | 0.7 | 预估 token 的每字系数（界面标注"粗略估计"） |
+| `TEXT_TITLE_MAX_CHARS` | 40 | 标题正则允许的最大行长 |
+| `TEXT_NUMBERED_TITLE_MIN_COUNT` / `TEXT_NUMBERED_TITLE_MAX_COUNT` | 3 / 200 | 数字编号标题正则启用所需的全文匹配数范围 |
+| `MD_SECTION_MIN_COUNT` / `MD_SECTION_MAX_COUNT` | 3 / 200 | Markdown 分节级别可接受的节数范围 |
 
 ## 7. 工作包与依赖
 

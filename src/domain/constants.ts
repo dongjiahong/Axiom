@@ -69,3 +69,26 @@ export const LLM_LOG_MAX_CHARS = 200000;
 /** 设置页允许的轮数上限范围（含端点）。 */
 export const MAX_TURNS_MIN = 4;
 export const MAX_TURNS_MAX = 30;
+
+/** 资料上传的文件大小上限（50MB）。 */
+export const UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
+
+/** 判定扫描版 PDF 的平均每页有效字符下限。 */
+export const PDF_MIN_CHARS_PER_PAGE = 50;
+
+/** 判定页眉/页脚时，同一行文本需要出现的页面比例。 */
+export const PDF_HEADER_FOOTER_PAGE_RATIO = 0.5;
+
+/** 预估 token 的每字系数（界面标注"粗略估计"）。 */
+export const TOKEN_ESTIMATE_PER_CHAR = 0.7;
+
+/** 标题正则允许的最大行长。 */
+export const TEXT_TITLE_MAX_CHARS = 40;
+
+/** 数字编号标题正则启用所需的全文匹配数范围（含端点）。 */
+export const TEXT_NUMBERED_TITLE_MIN_COUNT = 3;
+export const TEXT_NUMBERED_TITLE_MAX_COUNT = 200;
+
+/** Markdown 分节级别可接受的节数范围（含端点）。 */
+export const MD_SECTION_MIN_COUNT = 3;
+export const MD_SECTION_MAX_COUNT = 200;

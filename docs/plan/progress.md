@@ -141,3 +141,52 @@ pnpm build        # 通过，/api/settings* 与 /、/settings 均为动态路由
 - `runTask` 的 `ctx` 增加可选的 `db`、`client`，仅供测试注入；生产代码不传。
 - `src/domain/constants.ts` 新增 `LLM_LOG_MAX_CHARS`（200000）、`MAX_TURNS_MIN`（4）、`MAX_TURNS_MAX`（30），并写入 `README.md` §6。
 - 新增 `src/server/llm/fake.ts`（`isFakeLLM`）与 `src/server/llm/call-log.ts`，位置与 `README.md` §4 的目录结构一致或为其补充。
+
+## WP3 · 资料导入与解析
+
+### 完成内容
+
+1. **`src/server/parsing/`**（无 DB 依赖，可单测）：
+   - `errors.ts`：`ParseError`（message 为可直接展示的中文）。
+   - `detect.ts`：`detectFormat`（按扩展名）、`fallbackTitle`、`assertFormatMatchesContent`（epub=`PK\x03\x04`、pdf=`%PDF`；txt/md 不校验），以及统一的 `ParsedSource` / `ParsedSection` 类型。
+   - `text.ts`：编码检测（chardet；GB18030/GBK/Big5 用 iconv-lite 转 UTF-8，失败按 UTF-8）、`decodeUtf8Strict`、标题正则（中文「第X章/节…」、英文 Chapter/Part、数字编号），`splitByTitles` / `toSections` / `parseTxt`。
+   - `markdown.ts`：依次尝试 `#`/`##`/`###`，选第一个能切出 3–200 节的级别，都不满足退回 `#`；去掉行内与块级 Markdown 标记。
+   - `chunk.ts`：`buildChunks`（去空节 → 跳过「目录/版权/致谢…」→ 合并 <1500 字的过短节（标题用 `A / B` 连接，末尾过短节并入前一节）→ 按段落切分 >20000 字的过长节（标题 `原标题（i/n）`）→ 重新编号）与 `splitByMaxChars`。
+   - `epub.ts`：jszip + fast-xml-parser + cheerio。container.xml → OPF → manifest/spine；目录优先 EPUB3 `nav[epub:type=toc]`，其次 EPUB2 `toc.ncx`，只取顶层与第二层；按 spine 顺序取正文（删 script/style/nav，块级标签换行）；目录条目（含锚点）为节起点；无目录时每个 spine 文件一节，标题取首个 h1–h3，都没有则「第 N 部分」。
+   - `pdf.ts`：unpdf `getDocumentProxy` + `extractText({ mergePages: false })`；平均每页有效字符 <50 判定扫描版（中文报错）；`getOutline`+`getDestination`+`getPageIndex` 映射顶层书签为节边界；无书签用标题正则，仍无则整本一节；删除 ≥50% 页面首/末行重复的页眉页脚；合并被换行打断的句子。
+   - `index.ts`：`parseSource(format, buffer, filename)` 按格式分发。
+2. **`scripts/make-fixtures.ts`**（`pnpm tsx scripts/make-fixtures.ts`）：生成 6 个夹具并提交到 `tests/fixtures/`——`sample.epub`（epub3 + nav 三级目录，3 章中文，第二章含锚点子节）、`sample-no-toc.epub`、`sample-gbk.txt`（GBK 编码，3 个「第X章」标题）、`sample.md`（多级标题）、`sample.pdf`（pdf-lib 生成，3 章 + 书签）、`sample-no-bookmark.pdf`。夹具已提交，测试不依赖脚本运行。
+3. **`src/server/services/sources.ts`**：`resolveUploadsDir`（`${AXIOM_DATA_DIR}/uploads`）、`uploadSource`（校验扩展名/大小/魔数 → 解析 → 分块 → 保存到 `data/uploads/<id>.<ext>` → 同一事务写 `sources`+`source_chunks`；解析失败不落库）、`listSources`（含章节块数与方法论计数，聚合查询）、`getSourceDetail`（章节块摘要 + 当前 job + 预估 token）、`getChunkText`、`setChunkSkipped`（仅 pending↔skipped）、`deleteSource`（删 draft、删资料/章节块/上传文件，confirmed/archived 保留且 `sourceId` 置空）。
+4. **`src/server/dto/source.ts`**：`SourceListItemDto` / `SourceDetailDto` / `SourceChunkSummaryDto` / `SourceJobDto` / `SourceChunkTextDto`；详情不含章节块正文，正文单独接口下发。
+5. **接口**：`POST/GET /api/sources`、`GET/DELETE /api/sources/[id]`、`GET/PATCH /api/sources/[id]/chunks/[chunkId]`。
+6. **页面**：`/sources`（拖拽/点击上传 + 资料卡片列表 + 删除）与 `/sources/[id]`（头部信息 + 章节块表格 + 正文侧栏 Sheet + 跳过开关；「开始抽取/取消/重试失败章节」按钮禁用，待 WP4 接入）。组件 `src/components/sources/{sources-list,chunk-table,labels}.tsx`。
+7. **测试**：`tests/server/parsing/*`（detect/text/markdown/chunk/epub/pdf/夹具统一解析）与 `tests/server/sources.test.ts`（上传各夹具、GBK 不乱码、魔数与扩展名不符、空文件、超限、解析失败不落库、计数、跳过切换、删除规则）。
+
+### 验证方式
+
+```
+pnpm lint && pnpm typecheck   # 通过
+pnpm test                     # 17 个文件 / 144 个用例通过（新增 7 个文件 / 60 个用例）
+pnpm build                    # 通过；/sources 与 /sources/[id] 为动态路由
+pnpm tsx scripts/make-fixtures.ts   # 可重复生成 tests/fixtures/ 下的 6 个夹具
+```
+
+另用 `pnpm start`（独立 `AXIOM_DATA_DIR`）手工走通：上传 epub / GBK txt / pdf 均返回 `ready` 与合理章节块；打开详情页（200）与正文接口；切换跳过；扩展名不符返回 400 中文错误；删除返回 `{deleted:true}`。
+
+### 已知限制
+
+- **夹具章节都很短（<1500 字）**，分块阶段会合并为一节，所以页面上的「章节列表」每个夹具只有 1 行；这是分块规则（合并过短节）的预期行为，真实书籍章节足够长时不会合并。分节本身在解析层单测（`epub.test.ts` 等）中按节验证。
+- **未用真实书籍（epub/txt）做人工验收**：验收条款「上传以上各类文件都能看到合理的章节列表」用的是自建夹具，规模远小于真实书籍；建议再用一本真实中文 epub 走一遍。
+- **PDF 换行合并的语言启发式**：`algorithms.md` §1.3.5 只描述「合并被换行打断的中文句子」，实现中若前一行以 ASCII 字符结尾、下一行以 ASCII 字母数字开头则补一个空格（避免英文 PDF 出现 `understood.Repeat`）；中文仍按原文直接拼接。
+- `sources.status` 目前只会是 `ready`；`parsing`/`extracting`/`extracted`/`failed` 由 WP4 的抽取任务写入。`jobs` 表已建但无写入方，详情页的 `job` 恒为 `null`。
+- 上传为同步解析，超大 epub/pdf 会占用请求线程数秒（`api-and-ui.md` 说明可接受）。
+- 构建时 Next 会对 `writeFileSync(动态路径)` 给出 “filesystem access causes the whole project to be traced” 警告（非错误）；路径必须动态（`AXIOM_DATA_DIR`），未做抑制。
+- `db:seed` 生成的种子方法论与本次改动无交互；夹具文件已提交（约 3KB 级）。
+
+### 对公共契约的改动
+
+无 schema / 表结构 / 接口的既有契约改动。新增的接口与 DTO 均落在 `api-and-ui.md` §3 已列出的路径与形态之内（未实现其中的 `extract` 与 `jobs` 部分，属 WP4 范围）。以下为原文未明确、由本包补齐的实现细节：
+
+- `src/domain/constants.ts` 新增 `UPLOAD_MAX_BYTES`、`PDF_MIN_CHARS_PER_PAGE`、`PDF_HEADER_FOOTER_PAGE_RATIO`、`TOKEN_ESTIMATE_PER_CHAR`、`TEXT_TITLE_MAX_CHARS`、`TEXT_NUMBERED_TITLE_MIN_COUNT/MAX_COUNT`、`MD_SECTION_MIN_COUNT/MAX_COUNT`，并写入 `README.md` §6。
+- 上传文件路径定为 `${AXIOM_DATA_DIR}/uploads/<id>.<format>`（与 `data-model.md` 的 `data/uploads/<id>.<ext>` 一致）。
+- 新增依赖 `pdf-lib`（devDependency，仅 `scripts/make-fixtures.ts` 用于生成 PDF 夹具；运行时不使用）。
