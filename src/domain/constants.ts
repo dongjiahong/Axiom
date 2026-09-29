@@ -100,3 +100,22 @@ export const TEXT_NUMBERED_TITLE_MAX_COUNT = 200;
 /** Markdown 分节级别可接受的节数范围（含端点）。 */
 export const MD_SECTION_MIN_COUNT = 3;
 export const MD_SECTION_MAX_COUNT = 200;
+
+/** 识别结果对应的得分（algorithms.md §6），掌握度与统计共用。 */
+export const RECOGNITION_SCORE = { correct: 1, partial: 0.5, wrong: 0 } as const;
+
+/** 各难度允许的计划阻力数量（含端点，llm-and-prompts.md §8）。 */
+export const RESISTANCE_COUNT_RANGE = {
+  cooperative: { min: 1, max: 2 },
+  neutral: { min: 2, max: 3 },
+  tough: { min: 3, max: 5 },
+} as const;
+
+/** 场景生成时提供给 AI 的同一目标方法论的最近场景标题数量，用于避免雷同。 */
+export const SCENARIO_RECENT_TITLES = 10;
+
+/** 可见字段泄露检查：长度不小于此值的步骤标题才参与比对（过短的标题误伤率高）。 */
+export const SCENARIO_LEAK_MIN_STEP_TITLE_CHARS = 4;
+
+/** 综合测验选题范围内至少需要的已确认方法论数。 */
+export const QUIZ_MIN_SCOPE_SIZE = 2;

@@ -174,6 +174,11 @@ src/server/jobs/*     ← 进程内任务队列（抽取）
 | `MD_SECTION_MIN_COUNT` / `MD_SECTION_MAX_COUNT` | 3 / 200 | Markdown 分节级别可接受的节数范围 |
 | `FUZZY_SEGMENT_LENGTH` / `FUZZY_SEGMENT_STEP` | 8 / 4 | 模糊匹配时摘录切成的片段长度与步长 |
 | `CLUSTER_BATCH_SIZE` / `CLUSTER_BATCH_OVERLAP` | 150 / 20 | 去重聚类的分批大小与相邻批次重叠条数 |
+| `RECOGNITION_SCORE` | correct 1 / partial 0.5 / wrong 0 | 识别结果对应的得分，掌握度与统计共用 |
+| `RESISTANCE_COUNT_RANGE` | 配合 1–2 / 一般 2–3 / 强硬 3–5 | 各难度允许的计划阻力数量 |
+| `SCENARIO_RECENT_TITLES` | 10 | 场景生成时提供给 AI 的同一目标方法论最近场景标题数 |
+| `SCENARIO_LEAK_MIN_STEP_TITLE_CHARS` | 4 | 可见字段泄露检查中，参与比对的步骤标题最短长度 |
+| `QUIZ_MIN_SCOPE_SIZE` | 2 | 综合测验选题范围内至少需要的已确认方法论数 |
 
 ## 7. 工作包与依赖
 

@@ -294,3 +294,55 @@ pnpm build        # 通过
 - **`MergeSuggestionDto`** 增加 `sourceId`；`listMergeSuggestions(sourceId?, database?, status?)` 的 `sourceId` 改为可选并增加 `status` 参数，原有按资料查询的调用不受影响。
 - **WP4 代码的小改动**：`extract-source.ts` 的高置信合并改用共享的 `mergeDrafts`（行为不变，并新增“合并期间成员被改动则放弃”的检查，放弃时仍降级为合并建议）；`insertDraft` 的 `sourceId` 允许为 `null`；导出 `ensureTagIds`（`extraction/drafts.ts`）与 `describeIssue`（`prompts/common.ts`）；`merge` 任务的 `fake()` 在没有任何标签时补“未分类”（`promptVersion` 未变，输出 schema 未变）。
 - 新增 `GET /api/tags` 返回 `{ id, name, count }[]`，`count` 为使用该标签且未归档的方法论数量（原文“使用数量”未细化）。
+
+## WP6 · 选题与场景生成
+
+### 完成内容
+
+1. **领域纯函数**
+   - `src/domain/mastery.ts`：`computeMastery(methodologyId, records, now)`（`algorithms.md` §7）。执行取该方法论作为所用方法论的最近 5 场、识别取其作为目标方法论的最近 5 场综合测验；查看过提示折算 0.7；两者都没有为 0；衰减 `0.5 + 0.5 × 2^(−d/30)`（刚练过 1，30 天 0.75）。
+   - `src/domain/selection.ts`：`resolveScope`（标签 ∪ 资料 ∪ 方法论，全空 = 全部，保持库中顺序）、`pickWeighted`（权重 `1 − mastery + ε`，`rng` 可注入）。
+2. **`src/server/prompts/scenario.ts`**：`scenarioTask`（`scenario@1`，温度 0.9）。含提示词、输出 schema、`fake()`，以及全部语义校验：开场白与 `openingSpeaker` 一致；`linkedStepRef` 必须指向条件步骤；阻力数量随难度（1–2 / 2–3 / 3–5）；一般/强硬难度下条件步骤都要被阻力关联；`alternatives` 引用必须在 `others` 中；可见字段（title、background、userRole、userGoal、counterpart.*、openingLine）归一化后不得含目标/其他方法论名称，或长度 ≥4 的目标步骤标题。`buildScenarioInput` 负责生成短引用（步骤 `s1..`，其余方法论 `m1..`）。
+3. **`services/scenarios.ts`**：`generateScenario`——`resolveScope` → 校验（drill+pick 须指定已确认方法论；drill+random 范围非空；quiz 范围 ≥2）→ 目标（random 时用 `loadMasteryRecords` 从已复盘练习计算掌握度后加权抽取）→ 组装输入（`others` = 范围内其余已确认方法论，`recentTitles` = 该目标最近 10 个场景标题）→ `runTask` → 阻力分配 `r1..rn`、引用映射回真实 ID → 写入 `scenarios`（quiz 的 `candidateIds` = 范围内全部已确认方法论，drill 为 `[目标]`）。
+4. **`services/practice.ts`（创建部分）**：`createPractice`（生成场景 + 新建 briefing 会话，`maxTurns` 取设置值，drill 的 `selectedMethodologyId` = 目标）、`getSession`、`selectMethodology`（quiz，须在候选内，briefing 阶段可多次修改）、`startSession`（写入 `targetSnapshot` / `selectedSnapshot` / `startedAt`；对方先开口时插入 turn 0 的开场白）、`requestHint`（drill，置 `hintUsed`，返回骨架）。
+5. **`src/server/dto/session.ts`**：`toSessionDto` 严格按 `data-model.md` §4。复盘前，键本身不出现（而不是 null）：`brief`、`designNotes`、`alternatives`、`meta`、快照；quiz 还不下发 `targetMethodologyId` / `targetMethodologyName`，候选只含 `{ id, name, tags }` 并按名称（中文拼音序）排序。debriefed / debrief_failed 后下发目标、备选（含名称与理由）、设计说明、角色卡、消息 `meta` 与目标方法论骨架（`targetSkeleton`）。`toSkeletonDto` 是提示接口和复盘共用的方法论骨架（不含原文摘录）。
+6. **接口**：`POST /api/practice`（返回 `{ sessionId }`）、`GET /api/sessions/[id]`、`POST /api/sessions/[id]/select`、`/start`、`/hint`。
+7. **页面**：`/practice/new`（模式 → 选题〔drill 指定/随机、quiz 范围〕→ 难度 → 生成场景，实时显示范围内数量，不足 2 个时禁用；方法论库为空时引导去导入资料）；`/practice/[sessionId]` 的 briefing 状态（场景卡；drill 显示目标方法论名称与“查看方法论骨架”按钮，旁注明查看后会标记；quiz 为候选单选列表；“开始对话”）。active / ended 等状态暂只显示场景卡与“对话功能开发中”（WP7 负责）。
+8. **测试**
+   - `tests/domain/mastery.test.ts`、`selection.test.ts`：从未练习 = 0；执行与识别加权且各归其属；查看提示折算；最近 5 场；时间衰减（0 天 1、30 天 0.75、极久趋近 0.5）；固定 rng 抽取、并集、全空 = 全部。
+   - `tests/server/scenario-task.test.ts`：44 个用例，含 fake 在 drill/quiz × 三档难度 × 0/1/2/6 个条件步骤下都通过 schema 与语义校验；每个可见字段的泄露检查；阻力数量、`linkedStepRef`、条件步骤关联、备选引用。
+   - `tests/server/practice.test.ts`：24 个用例（内存库 + Fake LLM）——创建（drill/quiz、掌握度加权、recentTitles、各种 400 校验且不留脏数据）、select、start（快照正确、开场白 turn 0、409 场景、修改方法论不影响快照）、hint、**DTO 泄露测试**（quiz 在 briefing / active / ended 均无 `targetMethodologyId`、`alternatives`、`designNotes`、`brief` 等键；角色卡与设计说明的任意值不出现在序列化响应中；候选按名称排序且只有 id/name/tags；复盘后才揭晓）。
+
+### 验证方式
+
+```
+pnpm lint         # 通过
+pnpm typecheck    # 通过
+pnpm test         # 26 个文件 / 306 个用例通过（新增 4 个文件 / 82 个用例）
+pnpm build        # 通过（在临时拷贝中构建并验证，见下）
+```
+
+另在临时拷贝中以 `AXIOM_FAKE_LLM=1` + 独立 `AXIOM_DATA_DIR` + `db:seed` 启动 `next start`，用 curl 与浏览器（agent-browser）走通：
+- API：创建 quiz → `GET /api/sessions/[id]` 的候选按名称排序、无隐藏键；未选择就 start 返回 409；quiz 请求 hint 返回 409；范围不足返回 400 中文提示；非法入参返回 400。
+- 浏览器：`/practice/new?mode=quiz` 勾选“职场”标签生成综合测验 → briefing 只显示 3 个候选 → 选择并“开始对话”进入 active；专项练习指定“向领导提加薪” → “查看方法论骨架”展示适用条件、步骤（含条件步骤与触发）和原则。
+
+### 已知限制
+
+- **未用真实模型验证场景质量**：提示词效果（场景是否泄露做法、阻力是否真能触发条件步骤、quiz 场景能否区分候选）只在 Fake 模式和桩输出下验证，需要配置真实模型后人工试几场。
+- 复盘（WP8）尚未实现，所以“按掌握度加权”所用的已复盘练习在真实数据里暂时为空，此时所有方法论掌握度为 0、等权抽取；逻辑已由集成测试用手工插入的已复盘练习覆盖。
+- active / ended / debriefed 状态的练习页暂为占位（WP7 / WP8）。
+- 开场白消息的 `seq` 从 1 开始（`unique(sessionId, seq)`）；WP7 追加消息时应取 `max(seq) + 1`。
+- 阻力与条件步骤的关联规则：计划原文要求“neutral/tough 时每个条件步骤至少被一条阻力关联”，但当条件步骤数超过该难度允许的阻力上限（例如一般难度只允许 2–3 条、而方法论有 4 个条件步骤）时这条规则无法满足。实现为：要求关联到的不同条件步骤数 ≥ `min(条件步骤数, 阻力条数)`，即条件步骤不多时全部关联，否则每条阻力都关联到不同的条件步骤。
+- quiz 的 `selection` 在页面上固定发送 `random`（计划中“指定”的语义 = 用户勾选一组方法论作为范围，与随机在范围内加权抽取一致）；接口层 quiz + pick 与 quiz + random 行为相同。
+- drill + pick 时页面把 `scope` 设为 `{ methodologyIds: [所选] }`，因此 `others` 为空，避免专项练习把整个方法论库塞进提示词；接口层若传入更大的 `scope`，`others` 仍按计划取范围内其余已确认方法论。
+- 综合测验开始时若所选方法论或目标方法论已被退回候选 / 归档，`start` 返回 409（“所需的方法论已不在方法论库中”），没有自动换题。
+- 场景生成失败（AI 输出不合规、未配置模型等）不会留下场景或会话；新建练习页用 toast 展示错误。
+
+### 对公共契约的改动
+
+均为向后兼容的补充：
+
+- `src/domain/constants.ts` 与 `README.md` §6 新增 `RECOGNITION_SCORE`、`RESISTANCE_COUNT_RANGE`、`SCENARIO_RECENT_TITLES`、`SCENARIO_LEAK_MIN_STEP_TITLE_CHARS`、`QUIZ_MIN_SCOPE_SIZE`。`RECOGNITION_SCORE` 供 WP8 的 `recognition.ts` 和 WP9 统计复用。
+- `SessionDto`（`src/server/dto/session.ts`）是 `GET /api/sessions/[id]` 的响应形状：`scenario` 只含可见字段；`candidates` 仅 quiz；`targetMethodologyId` / `targetMethodologyName` 在 drill 始终下发、quiz 复盘后才下发；`brief` / `designNotes` / `alternatives` / `targetSkeleton` / 消息 `meta` 只在 debriefed / debrief_failed 下发。WP7 / WP8 需沿用该 DTO 并在其上扩展。
+- `POST /api/sessions/[id]/select` 与 `/start` 返回更新后的 `SessionDto`，`/hint` 返回方法论骨架 `MethodologySkeletonDto`；`POST /api/practice` 返回 `{ sessionId }`。
+- 服务函数 `requestHint`（避免与 React Hook 命名规则冲突，未使用 `useHint`）。
