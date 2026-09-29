@@ -45,7 +45,53 @@ function StatusBadge({ item }: { item: SessionListItemDto }) {
 /** 再练一次：以同一场景新建一场练习（api-and-ui.md §4.9、§4.10）。 */
 export function SessionsTable({ items }: { items: SessionListItemDto[] }) {
   return (
-    <div className="rounded-lg border">
+    <>
+      <SessionCards items={items} />
+      <SessionsDesktopTable items={items} />
+    </>
+  );
+}
+
+/** 小屏：每场练习一张卡片，关键信息与操作都在屏内。 */
+function SessionCards({ items }: { items: SessionListItemDto[] }) {
+  return (
+    <ul className="space-y-3 md:hidden">
+      {items.map((item) => (
+        <li key={item.id} className="space-y-2 rounded-lg border p-3 text-sm">
+          <div className="flex items-start justify-between gap-2">
+            <Link href={sessionHref(item)} className="font-medium hover:underline">
+              {item.scenarioTitle}
+            </Link>
+            <StatusBadge item={item} />
+          </div>
+          <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            <span>{formatDateTime(item.createdAt)}</span>
+            <span>{MODE_LABELS[item.mode]}</span>
+            <span>难度：{DIFFICULTY_LABELS[item.difficulty]}</span>
+          </div>
+          {item.methodologyName ? <p className="text-xs">方法论：{item.methodologyName}</p> : null}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <span>
+              执行分 <b className="tabular-nums">{formatScore(item.executionScore)}</b>
+            </span>
+            {item.recognition !== null ? <span>识别：{RECOGNITION_LABELS[item.recognition]}</span> : null}
+            {item.outcome !== null ? <span>说服结果：{OUTCOME_SHORT_LABELS[item.outcome]}</span> : null}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" asChild>
+              <Link href={sessionHref(item)}>{sessionActionLabel(item)}</Link>
+            </Button>
+            <RetryButton scenarioId={item.scenarioId} size="sm" />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function SessionsDesktopTable({ items }: { items: SessionListItemDto[] }) {
+  return (
+    <div className="hidden rounded-lg border md:block">
       <Table>
         <TableHeader>
           <TableRow>

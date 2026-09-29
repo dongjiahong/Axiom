@@ -50,6 +50,7 @@ test("专项练习：导入 → 抽取 → 确认 → 练习 → 复盘改判 �
 
   // 3. 编辑并确认入库
   await draftLink.click();
+  await page.getByRole("button", { name: "编辑", exact: true }).click();
   await page.getByLabel("方法论名称").fill(METHODOLOGY_NAME);
   await page.getByRole("button", { name: "确认入库" }).click();
   await expect(page.getByRole("button", { name: "退回候选" })).toBeVisible({ timeout: 20_000 });

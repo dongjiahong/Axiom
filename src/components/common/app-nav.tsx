@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   { href: "/settings", label: "设置", icon: Settings },
 ];
 
-export function AppNav() {
+export function AppNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
@@ -39,6 +39,7 @@ export function AppNav() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
               "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",

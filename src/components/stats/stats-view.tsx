@@ -170,7 +170,56 @@ function OverviewTable({ rows, filtered }: { rows: MethodologyOverviewDto[]; fil
     );
   }
 
+  const toggle = (id: string) => setExpanded((current) => (current === id ? null : id));
+
   return (
+    <>
+      <ul className="space-y-3 md:hidden">
+        {rows.map((row) => (
+          <li key={row.methodologyId} className="rounded-lg border text-sm">
+            <button
+              type="button"
+              className="w-full space-y-2 p-3 text-left"
+              aria-expanded={expanded === row.methodologyId}
+              onClick={() => toggle(row.methodologyId)}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">{row.name}</span>
+                {row.status === "archived" ? <Badge variant="outline">已归档</Badge> : null}
+              </div>
+              {row.tags.length > 0 ? (
+                <p className="text-muted-foreground text-xs">{row.tags.join("、")}</p>
+              ) : null}
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <Metric label="专项 / 测验" value={`${row.drillCount} / ${row.quizCount}`} />
+                <Metric label="掌握度" value={formatMastery(row.mastery)} />
+                <Metric label="全部均值" value={formatScore(row.execAvgAll)} />
+                <Metric label="最近 5 场" value={formatScore(row.execAvgRecent)} />
+                <Metric
+                  label="看过 / 未看提示"
+                  value={`${formatScore(row.execAvgWithHint)} / ${formatScore(row.execAvgWithoutHint)}`}
+                />
+                <Metric
+                  label="识别正确率"
+                  value={
+                    row.recognitionAccuracy === null
+                      ? "—"
+                      : `${formatPercent(row.recognitionAccuracy)}（${row.recognitionN}）`
+                  }
+                />
+                <Metric label="最近练习" value={formatDate(row.lastPracticedAt)} />
+              </dl>
+            </button>
+            {expanded === row.methodologyId ? (
+              <div className="bg-muted/30 rounded-b-lg border-t p-3">
+                <TrendDetail points={row.execTrend} />
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden md:block">
     <Table>
       <TableHeader>
         <TableRow>
@@ -226,30 +275,7 @@ function OverviewTable({ rows, filtered }: { rows: MethodologyOverviewDto[]; fil
             {expanded === row.methodologyId ? (
               <TableRow>
                 <TableCell colSpan={10} className="bg-muted/30">
-                  {row.execTrend.length === 0 ? (
-                    <p className="text-muted-foreground py-6 text-center text-sm">
-                      还没有练习记录。
-                    </p>
-                  ) : (
-                    <div className="space-y-2 py-2">
-                      <TrendChart points={row.execTrend} />
-                      <div className="flex flex-wrap gap-3 text-xs">
-                        {DIFFICULTY_ORDER.map((key) => (
-                          <span key={key} className="flex items-center gap-1">
-                            <span
-                              className="inline-block size-2.5 rounded-full"
-                              style={{ backgroundColor: DIFFICULTY_COLORS[key] }}
-                            />
-                            {DIFFICULTY_LABELS[key]}
-                          </span>
-                        ))}
-                        <span className="text-muted-foreground flex items-center gap-1">
-                          <span className="inline-block size-2.5 rounded-full border-2 bg-white" />
-                          空心表示查看过提示
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                  <TrendDetail points={row.execTrend} />
                 </TableCell>
               </TableRow>
             ) : null}
@@ -257,6 +283,44 @@ function OverviewTable({ rows, filtered }: { rows: MethodologyOverviewDto[]; fil
         ))}
       </TableBody>
     </Table>
+      </div>
+    </>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-2">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="tabular-nums">{value}</dd>
+    </div>
+  );
+}
+
+/** 展开后的执行分趋势图与图例。 */
+function TrendDetail({ points }: { points: TrendPoint[] }) {
+  if (points.length === 0) {
+    return <p className="text-muted-foreground py-6 text-center text-sm">还没有练习记录。</p>;
+  }
+  return (
+    <div className="space-y-2 py-2">
+      <TrendChart points={points} />
+      <div className="flex flex-wrap gap-3 text-xs">
+        {DIFFICULTY_ORDER.map((key) => (
+          <span key={key} className="flex items-center gap-1">
+            <span
+              className="inline-block size-2.5 rounded-full"
+              style={{ backgroundColor: DIFFICULTY_COLORS[key] }}
+            />
+            {DIFFICULTY_LABELS[key]}
+          </span>
+        ))}
+        <span className="text-muted-foreground flex items-center gap-1">
+          <span className="inline-block size-2.5 rounded-full border-2 bg-white" />
+          空心表示查看过提示
+        </span>
+      </div>
+    </div>
   );
 }
 

@@ -26,6 +26,7 @@ import {
 } from "./editor-sections";
 import { ExcerptDrawer } from "./excerpt";
 import { CREATED_BY_LABELS, RequestError, requestJson, STATUS_LABELS } from "./labels";
+import { MethodologyView } from "./methodology-view";
 
 type Issue = { path: string; message: string };
 
@@ -80,6 +81,7 @@ export function MethodologyEditor({
   const [splitMode, setSplitMode] = useState(false);
   const [splitSelected, setSplitSelected] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [mode, setMode] = useState<"view" | "edit">("view");
 
   const form = useForm<EditorFormValues>({ defaultValues: toForm(initial) });
   const { control, register, reset, getValues, setValue } = form;
@@ -112,7 +114,20 @@ export function MethodologyEditor({
     setData(next);
     reset(toForm(next));
     setIssues([]);
+    setMode("view");
+    setSplitMode(false);
+    setSplitSelected([]);
     router.refresh();
+  }
+
+  function cancelEdit() {
+    if (dirty && !window.confirm("放弃未保存的修改吗？")) return;
+    reset(toForm(data));
+    setIssues([]);
+    setSplitMode(false);
+    setSplitSelected([]);
+    setTagInput("");
+    setMode("view");
   }
 
   /** 统一处理请求：忙碌状态、错误提示、校验问题列表。 */
@@ -123,6 +138,8 @@ export function MethodologyEditor({
     } catch (err) {
       if (err instanceof RequestError && err.issues?.length) {
         setIssues(err.issues);
+        // 校验问题要定位到具体输入框，只有编辑模式才有。
+        setMode("edit");
         toast.error(`有 ${err.issues.length} 个问题需要先修正`);
       } else {
         toast.error(err instanceof Error ? err.message : "操作失败");
@@ -193,6 +210,56 @@ export function MethodologyEditor({
     );
 
   const suggestions = allTags.filter((t) => !tags.includes(t));
+
+  const lifecycleButtons = (
+    <>
+      {data.status === "draft" ? (
+        <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void transition("confirm")}>
+          {busy === "confirm" ? "确认中……" : "确认入库"}
+        </Button>
+      ) : null}
+      {data.status === "confirmed" ? (
+        <Button type="button" variant="outline" disabled={busy !== null || dirty} onClick={() => void transition("unconfirm")}>
+          退回候选
+        </Button>
+      ) : null}
+      {data.status !== "archived" ? (
+        <Button type="button" variant="outline" disabled={busy !== null || dirty} onClick={() => void transition("archive")}>
+          归档
+        </Button>
+      ) : (
+        <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void transition("restore")}>
+          {data.mergedIntoId ? "恢复（撤销合并）" : "恢复"}
+        </Button>
+      )}
+    </>
+  );
+
+  const excerptDrawer = (
+    <ExcerptDrawer excerpt={excerpt} originChunks={data.originChunks} onClose={() => setExcerpt(null)} />
+  );
+
+  if (mode === "view") {
+    return (
+      <>
+        <MethodologyView
+          data={data}
+          onOpenExcerpt={setExcerpt}
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              {!readOnly ? (
+                <Button type="button" disabled={busy !== null} onClick={() => setMode("edit")}>
+                  编辑
+                </Button>
+              ) : null}
+              {lifecycleButtons}
+            </div>
+          }
+        />
+        {excerptDrawer}
+      </>
+    );
+  }
 
   return (
     <form
@@ -271,25 +338,7 @@ export function MethodologyEditor({
               {busy === "save" ? "保存中……" : dirty ? "保存" : "已保存"}
             </Button>
           ) : null}
-          {data.status === "draft" ? (
-            <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void transition("confirm")}>
-              {busy === "confirm" ? "确认中……" : "确认入库"}
-            </Button>
-          ) : null}
-          {data.status === "confirmed" ? (
-            <Button type="button" variant="outline" disabled={busy !== null || dirty} onClick={() => void transition("unconfirm")}>
-              退回候选
-            </Button>
-          ) : null}
-          {data.status !== "archived" ? (
-            <Button type="button" variant="outline" disabled={busy !== null || dirty} onClick={() => void transition("archive")}>
-              归档
-            </Button>
-          ) : (
-            <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void transition("restore")}>
-              {data.mergedIntoId ? "恢复（撤销合并）" : "恢复"}
-            </Button>
-          )}
+          {lifecycleButtons}
           {data.status === "draft" ? (
             <Button
               type="button"
@@ -308,6 +357,9 @@ export function MethodologyEditor({
               拆分为新方法论（{splitSelected.length}）
             </Button>
           ) : null}
+          <Button type="button" variant="ghost" disabled={busy !== null} onClick={cancelEdit}>
+            取消编辑
+          </Button>
           {dirty ? <span className="text-sm text-amber-600">有未保存的修改</span> : null}
         </div>
       </div>
@@ -342,23 +394,6 @@ export function MethodologyEditor({
           </div>
         </section>
 
-        <ItemListSection
-          control={control}
-          register={register}
-          name="body.applicability"
-          title="适用条件"
-          hint="方法论适合使用的情境特征，是场景生成与识别评判的依据。确认入库至少需要 1 条。"
-          onOpenExcerpt={setExcerpt}
-        />
-        <ItemListSection
-          control={control}
-          register={register}
-          name="body.counterIndications"
-          title="反例"
-          hint="方法论不适合使用的情境特征，用于综合测验中构造干扰。"
-          onOpenExcerpt={setExcerpt}
-        />
-
         <section className="space-y-2">
           <h2 className="text-lg font-medium">顺序模式</h2>
           <Controller
@@ -389,11 +424,27 @@ export function MethodologyEditor({
             setSplitSelected((current) => (checked ? [...current, stepId] : current.filter((id) => id !== stepId)))
           }
         />
+        <ItemListSection
+          control={control}
+          register={register}
+          name="body.applicability"
+          title="适用条件"
+          hint="方法论适合使用的情境特征，是场景生成与识别评判的依据。确认入库至少需要 1 条。"
+          onOpenExcerpt={setExcerpt}
+        />
+        <ItemListSection
+          control={control}
+          register={register}
+          name="body.counterIndications"
+          title="反例"
+          hint="方法论不适合使用的情境特征，用于综合测验中构造干扰。"
+          onOpenExcerpt={setExcerpt}
+        />
         <PrinciplesSection control={control} register={register} onOpenExcerpt={setExcerpt} />
         <ConceptsSection control={control} register={register} onOpenExcerpt={setExcerpt} />
       </fieldset>
 
-      <ExcerptDrawer excerpt={excerpt} originChunks={data.originChunks} onClose={() => setExcerpt(null)} />
+      {excerptDrawer}
     </form>
   );
 }

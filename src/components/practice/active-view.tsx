@@ -185,10 +185,11 @@ export function ActiveView({ session }: { session: SessionDto }) {
             </Button>
           </div>
         ) : null}
-        <div ref={bottomRef} />
+        <div ref={bottomRef} className="scroll-mb-40 md:scroll-mb-0" />
       </div>
 
-      <div className="space-y-2">
+      {/* 小屏输入框固定在底部，长对话中也能随时输入 */}
+      <div className="bg-background sticky bottom-0 -mx-4 space-y-2 border-t px-4 pt-3 pb-3 md:static md:mx-0 md:border-0 md:p-0">
         <Textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

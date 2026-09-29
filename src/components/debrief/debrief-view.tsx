@@ -18,8 +18,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { QUALITY_RANGE } from "@/domain/constants";
+import { useMediaQuery } from "@/lib/use-media-query";
 import type { KeyPointVerdictValue, PrincipleVerdictValue } from "@/domain/schemas";
 import type { DebriefDto, OverrideResultDto, VerdictDto } from "@/server/dto/debrief";
 
@@ -64,13 +66,17 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
   const [active, setActive] = useState<ActiveEvidence | null>(null);
   const [overrideTarget, setOverrideTarget] = useState<VerdictDto | null>(null);
   const [showConversation, setShowConversation] = useState(true);
+  const [conversationSheetOpen, setConversationSheetOpen] = useState(false);
+  // 与 lg 断点一致：大屏对话在右侧栏，小屏在底部抽屉。
+  const sideBySide = useMediaQuery("(min-width: 1024px)");
   const nonce = useRef(0);
 
   const conceptById = useMemo(() => new Map(dto.concepts.map((c) => [c.id, c])), [dto.concepts]);
   const stepTitle = (id: string) => dto.steps.find((s) => s.id === id)?.title ?? "";
 
   function focusEvidence(turn: number, quote: string, matched: boolean) {
-    setShowConversation(true);
+    if (sideBySide) setShowConversation(true);
+    else setConversationSheetOpen(true);
     setActive({ turn, quote: matched ? quote : "", nonce: ++nonce.current });
   }
 
@@ -95,6 +101,10 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-4">
+          <Button variant="outline" className="w-full lg:hidden" onClick={() => setConversationSheetOpen(true)}>
+            查看完整对话
+          </Button>
+
           {/* 头部 */}
           <Card>
             <CardHeader>
@@ -289,18 +299,29 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
         </div>
 
         {/* 完整对话 */}
-        <aside className="lg:sticky lg:top-4 lg:self-start">
-          <div className="flex items-center justify-between pb-2">
-            <h2 className="font-semibold">完整对话</h2>
-            <Button size="sm" variant="ghost" onClick={() => setShowConversation((v) => !v)}>
-              {showConversation ? "折叠" : "展开"}
-            </Button>
-          </div>
-          {showConversation ? (
-            <Conversation dto={dto} active={active} />
-          ) : null}
-        </aside>
+        {sideBySide ? (
+          <aside className="sticky top-4 self-start">
+            <div className="flex items-center justify-between pb-2">
+              <h2 className="font-semibold">完整对话</h2>
+              <Button size="sm" variant="ghost" onClick={() => setShowConversation((v) => !v)}>
+                {showConversation ? "折叠" : "展开"}
+              </Button>
+            </div>
+            {showConversation ? <Conversation dto={dto} active={active} /> : null}
+          </aside>
+        ) : null}
       </div>
+
+      <Sheet open={!sideBySide && conversationSheetOpen} onOpenChange={setConversationSheetOpen}>
+        <SheetContent side="bottom" className="max-h-[85vh] gap-0">
+          <SheetHeader>
+            <SheetTitle>完整对话</SheetTitle>
+          </SheetHeader>
+          <div className="px-4 pb-4">
+            <Conversation dto={dto} active={active} className="max-h-[70vh]" />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <OverrideDialog
         target={overrideTarget}
@@ -321,7 +342,15 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
 
 // ───────────── 对话面板 ─────────────
 
-function Conversation({ dto, active }: { dto: DebriefDto; active: ActiveEvidence | null }) {
+function Conversation({
+  dto,
+  active,
+  className = "max-h-[80vh]",
+}: {
+  dto: DebriefDto;
+  active: ActiveEvidence | null;
+  className?: string;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const counterpart = dto.session.scenario.counterpart.name;
 
@@ -333,7 +362,7 @@ function Conversation({ dto, active }: { dto: DebriefDto; active: ActiveEvidence
   }, [active]);
 
   return (
-    <div ref={container} className="max-h-[80vh] space-y-3 overflow-y-auto rounded-lg border p-3">
+    <div ref={container} className={`${className} space-y-3 overflow-y-auto rounded-lg border p-3`}>
       {dto.session.messages.map((m) => {
         const isUser = m.role === "user";
         const highlighted = isUser && active?.turn === m.turn;
