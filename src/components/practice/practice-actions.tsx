@@ -62,10 +62,9 @@ export function SwitchMethodologyButton({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mode: "drill",
           selection: "pick",
           methodologyId,
-          scope: { tagIds: [], sourceIds: [], methodologyIds: [methodologyId] },
+          scope: { tagIds: [], sourceIds: [] },
           difficulty,
         }),
       });

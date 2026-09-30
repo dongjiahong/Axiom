@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import type { Difficulty, Outcome, PracticeMode, Recognition } from "@/domain/schemas";
+import type { Difficulty, Outcome } from "@/domain/schemas";
 import {
   debriefs,
   methodologies,
@@ -15,7 +15,6 @@ import {
   type SessionStatus,
 } from "@/server/db/schema";
 import {
-  getStatsConfusion,
   getStatsDifficulty,
   getStatsOverview,
   listWeakestMethodologies,
@@ -25,7 +24,7 @@ import { makeMethodologyBody } from "../fixtures/methodology";
 import { createTestDb, type TestDb } from "../helpers/db";
 
 /**
- * 统计：只统计已复盘的练习；执行归属于所用方法论，识别归属于目标方法论。
+ * 统计：只统计已复盘的练习；执行归属于目标方法论。
  * 每个 describe 自建所需的最小数据（beforeEach 清库）。
  */
 
@@ -108,16 +107,12 @@ function addMethodology(opts: {
 }
 
 interface SessionSpec {
-  /** 默认 = 目标方法论。 */
-  selected?: string | null;
   target: string;
-  mode: PracticeMode;
   difficulty: Difficulty;
   hintUsed?: boolean;
   /** 相对 T0 的天数。 */
   at: number;
   executionScore: number;
-  recognition?: Recognition | null;
   outcome?: Outcome;
   status?: SessionStatus;
 }
@@ -134,8 +129,7 @@ function addSession(spec: SessionSpec): string {
       targetMethodologyId: spec.target,
       targetVersion: 1,
       difficulty: spec.difficulty,
-      scope: { tagIds: [], sourceIds: [], methodologyIds: [] },
-      candidateIds: [spec.target],
+      scope: { tagIds: [], sourceIds: [] },
       title: "场景",
       background: "背景",
       userRole: "你",
@@ -153,9 +147,8 @@ function addSession(spec: SessionSpec): string {
         yieldConditions: "让步条件",
         breakdownConditions: "谈崩条件",
       },
-      alternatives: [],
       designNotes: "设计说明",
-      promptVersion: "scenario@1",
+      promptVersion: "scenario@2",
       createdAt: endedAt,
     })
     .run();
@@ -166,11 +159,8 @@ function addSession(spec: SessionSpec): string {
     .values({
       id: sessionId,
       scenarioId,
-      mode: spec.mode,
       status,
-      selectedMethodologyId: spec.selected === undefined ? spec.target : spec.selected,
       targetSnapshot: null,
-      selectedSnapshot: null,
       hintUsed: spec.hintUsed ?? false,
       maxTurns: 12,
       endReason: "user",
@@ -187,8 +177,6 @@ function addSession(spec: SessionSpec): string {
       .values({
         id: nanoid(),
         sessionId,
-        recognition: spec.recognition ?? null,
-        recognitionExplanation: null,
         executionScore: spec.executionScore,
         scoreBreakdown: {
           base: spec.executionScore,
@@ -204,7 +192,7 @@ function addSession(spec: SessionSpec): string {
         outcome: spec.outcome ?? "unresolved",
         outcomeNote: "说明",
         summary: { strengths: [], improvements: [] },
-        promptVersion: "debrief@1",
+        promptVersion: "debrief@2",
         createdAt: endedAt,
         updatedAt: endedAt,
       })
@@ -243,21 +231,21 @@ describe("方法论概览", () => {
     addMethodology({ id: M4, name: "丁方法", status: "archived" });
     addMethodology({ id: M5, name: "戊方法", status: "draft" });
 
-    // 甲：6 场专项（其中 1 场看过提示）+ 1 场综合测验；执行分 80/40/100/70/30/10/20
-    const drill = (at: number, difficulty: Difficulty, executionScore: number, hintUsed = false) =>
-      addSession({ target: M1, mode: "drill", difficulty, hintUsed, at, executionScore });
-    drill(1, "cooperative", 80);
-    drill(2, "tough", 40, true);
-    drill(4, "cooperative", 100);
-    drill(8, "neutral", 30);
-    drill(9, "tough", 10);
-    drill(10, "cooperative", 20);
-    addSession({ target: M1, mode: "quiz", difficulty: "neutral", at: 6, executionScore: 70, recognition: "correct" });
+    // 甲：7 场练习（其中 1 场看过提示）；执行分 80/40/100/70/30/10/20
+    const practice = (at: number, difficulty: Difficulty, executionScore: number, hintUsed = false) =>
+      addSession({ target: M1, difficulty, hintUsed, at, executionScore });
+    practice(1, "cooperative", 80);
+    practice(2, "tough", 40, true);
+    practice(4, "cooperative", 100);
+    practice(6, "neutral", 70);
+    practice(8, "neutral", 30);
+    practice(9, "tough", 10);
+    practice(10, "cooperative", 20);
     // 丙：已归档但有 1 场练习
-    addSession({ target: M3, mode: "drill", difficulty: "cooperative", at: 7, executionScore: 90 });
+    addSession({ target: M3, difficulty: "cooperative", at: 7, executionScore: 90 });
     // 未复盘 / 未开始的练习不计入
-    addSession({ target: M1, mode: "drill", difficulty: "cooperative", at: 12, executionScore: 0, status: "ended" });
-    addSession({ target: M1, mode: "quiz", difficulty: "tough", at: 13, executionScore: 0, status: "active" });
+    addSession({ target: M1, difficulty: "cooperative", at: 12, executionScore: 0, status: "ended" });
+    addSession({ target: M1, difficulty: "tough", at: 13, executionScore: 0, status: "active" });
   });
 
   it("每个字段按统计口径聚合，且不统计未复盘的练习", () => {
@@ -267,28 +255,25 @@ describe("方法论概览", () => {
       name: "甲方法",
       status: "confirmed",
       tags: ["职场"],
-      drillCount: 6,
-      quizCount: 1,
+      practiceCount: 7,
       execAvgAll: 50,
       execAvgRecent: 46,
       execAvgWithHint: 40,
-      execAvgWithoutHint: 48,
+      execAvgWithoutHint: 51.7,
       execTrend: [
-        { endedAt: T0 + 1 * DAY, executionScore: 80, difficulty: "cooperative", mode: "drill", hintUsed: false },
-        { endedAt: T0 + 2 * DAY, executionScore: 40, difficulty: "tough", mode: "drill", hintUsed: true },
-        { endedAt: T0 + 4 * DAY, executionScore: 100, difficulty: "cooperative", mode: "drill", hintUsed: false },
-        { endedAt: T0 + 6 * DAY, executionScore: 70, difficulty: "neutral", mode: "quiz", hintUsed: false },
-        { endedAt: T0 + 8 * DAY, executionScore: 30, difficulty: "neutral", mode: "drill", hintUsed: false },
-        { endedAt: T0 + 9 * DAY, executionScore: 10, difficulty: "tough", mode: "drill", hintUsed: false },
-        { endedAt: T0 + 10 * DAY, executionScore: 20, difficulty: "cooperative", mode: "drill", hintUsed: false },
+        { endedAt: T0 + 1 * DAY, executionScore: 80, difficulty: "cooperative", hintUsed: false },
+        { endedAt: T0 + 2 * DAY, executionScore: 40, difficulty: "tough", hintUsed: true },
+        { endedAt: T0 + 4 * DAY, executionScore: 100, difficulty: "cooperative", hintUsed: false },
+        { endedAt: T0 + 6 * DAY, executionScore: 70, difficulty: "neutral", hintUsed: false },
+        { endedAt: T0 + 8 * DAY, executionScore: 30, difficulty: "neutral", hintUsed: false },
+        { endedAt: T0 + 9 * DAY, executionScore: 10, difficulty: "tough", hintUsed: false },
+        { endedAt: T0 + 10 * DAY, executionScore: 20, difficulty: "cooperative", hintUsed: false },
       ],
-      recognitionAccuracy: 1,
-      recognitionN: 1,
       mastery: expect.any(Number),
       lastPracticedAt: T0 + 10 * DAY,
     });
-    // 掌握度：E =（20+10+30+70+100）/5/100 = 0.46，R = 1，base = 0.676；10 天前练过，decay ≈ 0.89685
-    expect(m1.mastery).toBeCloseTo(0.6063, 3);
+    // 掌握度：最近 5 场均值（20+10+30+70+100）/5/100 = 0.46；10 天前练过，decay ≈ 0.89685
+    expect(m1.mastery).toBeCloseTo(0.4126, 3);
 
     const m2 = overviewRow("乙方法");
     expect(m2).toEqual({
@@ -296,15 +281,12 @@ describe("方法论概览", () => {
       name: "乙方法",
       status: "confirmed",
       tags: ["亲密关系"],
-      drillCount: 0,
-      quizCount: 0,
+      practiceCount: 0,
       execAvgAll: null,
       execAvgRecent: null,
       execAvgWithHint: null,
       execAvgWithoutHint: null,
       execTrend: [],
-      recognitionAccuracy: null,
-      recognitionN: 0,
       mastery: 0,
       lastPracticedAt: null,
     });
@@ -314,14 +296,11 @@ describe("方法论概览", () => {
       methodologyId: M3,
       name: "丙方法",
       status: "archived",
-      drillCount: 1,
-      quizCount: 0,
+      practiceCount: 1,
       execAvgAll: 90,
       execAvgRecent: 90,
       execAvgWithHint: null,
       execAvgWithoutHint: 90,
-      recognitionAccuracy: null,
-      recognitionN: 0,
       lastPracticedAt: T0 + 7 * DAY,
     });
     expect(m3.mastery).toBeCloseTo(0.7832, 3);
@@ -337,7 +316,7 @@ describe("方法论概览", () => {
 
   it("execTrend 最多保留最近 STATS_TREND_LIMIT 场（按时间正序）", () => {
     for (let i = 14; i < 40; i++) {
-      addSession({ target: M1, mode: "drill", difficulty: "neutral", at: i, executionScore: i % 100 });
+      addSession({ target: M1, difficulty: "neutral", at: i, executionScore: i % 100 });
     }
     const m1 = overviewRow("甲方法");
     expect(m1.execTrend).toHaveLength(30);
@@ -380,76 +359,6 @@ describe("方法论概览", () => {
   });
 });
 
-// ───────────── 识别混淆 ─────────────
-
-describe("识别混淆", () => {
-  const MA = "ma";
-  const MB = "mb";
-  const MC = "mc";
-
-  beforeEach(() => {
-    addMethodology({ id: MA, name: "甲方法", tagNames: ["职场"] });
-    addMethodology({ id: MB, name: "乙方法", tagNames: ["亲密关系"] });
-    addMethodology({ id: MC, name: "丙方法", tagNames: ["家庭"] });
-
-    const quiz = (at: number, target: string, selected: string, recognition: Recognition) =>
-      addSession({ target, selected, mode: "quiz", difficulty: "neutral", at, executionScore: 60, recognition });
-
-    quiz(1, MA, MB, "wrong");
-    quiz(2, MA, MB, "wrong");
-    quiz(3, MA, MB, "wrong");
-    quiz(4, MB, MA, "partial");
-    quiz(5, MB, MA, "partial");
-    quiz(6, MB, MC, "wrong");
-    // 选对的不算混淆；专项练习没有识别
-    quiz(7, MA, MA, "correct");
-    addSession({ target: MA, selected: MA, mode: "drill", difficulty: "neutral", at: 8, executionScore: 80 });
-  });
-
-  it("只列 selectedId ≠ targetId 的组合，按次数降序", () => {
-    expect(getStatsConfusion({}, { database: test.db })).toEqual([
-      {
-        targetId: MA,
-        targetName: "甲方法",
-        selectedId: MB,
-        selectedName: "乙方法",
-        wrongCount: 3,
-        partialCount: 0,
-      },
-      {
-        targetId: MB,
-        targetName: "乙方法",
-        selectedId: MA,
-        selectedName: "甲方法",
-        wrongCount: 0,
-        partialCount: 2,
-      },
-      {
-        targetId: MB,
-        targetName: "乙方法",
-        selectedId: MC,
-        selectedName: "丙方法",
-        wrongCount: 1,
-        partialCount: 0,
-      },
-    ]);
-  });
-
-  it("筛选：目标或所选任一方匹配即保留", () => {
-    expect(getStatsConfusion({ tagId: tagIdOf("家庭") }, { database: test.db })).toHaveLength(1);
-    expect(getStatsConfusion({ tagId: tagIdOf("家庭") }, { database: test.db })[0]).toMatchObject({
-      targetId: MB,
-      selectedId: MC,
-    });
-    expect(
-      getStatsConfusion({ tagId: tagIdOf("职场") }, { database: test.db }).map((row) => [row.targetId, row.selectedId]),
-    ).toEqual([
-      [MA, MB], // 目标匹配
-      [MB, MA], // 所选匹配
-    ]);
-  });
-});
-
 // ───────────── 难度分层 ─────────────
 
 describe("难度分层", () => {
@@ -462,13 +371,12 @@ describe("难度分层", () => {
     addMethodology({ id: M2, name: "乙方法", tagNames: ["亲密关系"] });
     addMethodology({ id: M3, name: "丙方法", tagNames: ["家庭"] });
 
-    addSession({ target: M1, mode: "drill", difficulty: "cooperative", at: 1, executionScore: 80, outcome: "agreed" });
-    addSession({ target: M1, mode: "drill", difficulty: "cooperative", at: 2, executionScore: 100, outcome: "agreed" });
-    addSession({ target: M1, mode: "drill", difficulty: "tough", at: 3, executionScore: 40, outcome: "refused" });
-    addSession({ target: M2, selected: M1, mode: "quiz", difficulty: "tough", at: 4, executionScore: 70, outcome: "partial", recognition: "wrong" });
-    addSession({ target: M2, mode: "drill", difficulty: "cooperative", at: 5, executionScore: 50, outcome: "partial" });
-    addSession({ target: M2, mode: "drill", difficulty: "tough", at: 6, executionScore: 100, outcome: "refused" });
-    addSession({ target: M3, mode: "drill", difficulty: "neutral", at: 7, executionScore: 60, outcome: "unresolved" });
+    addSession({ target: M1, difficulty: "cooperative", at: 1, executionScore: 80, outcome: "agreed" });
+    addSession({ target: M1, difficulty: "cooperative", at: 2, executionScore: 100, outcome: "agreed" });
+    addSession({ target: M1, difficulty: "tough", at: 3, executionScore: 40, outcome: "refused" });
+    addSession({ target: M2, difficulty: "cooperative", at: 5, executionScore: 50, outcome: "partial" });
+    addSession({ target: M2, difficulty: "tough", at: 6, executionScore: 100, outcome: "refused" });
+    addSession({ target: M3, difficulty: "neutral", at: 7, executionScore: 60, outcome: "unresolved" });
   });
 
   it("总体：每个难度的场数、执行分均值与说服结果分布", () => {
@@ -485,9 +393,9 @@ describe("难度分层", () => {
         outcomeDistribution: { agreed: 0, partial: 0, refused: 0, unresolved: 1 },
       },
       tough: {
-        n: 3,
+        n: 2,
         execAvg: 70,
-        outcomeDistribution: { agreed: 0, partial: 1, refused: 2, unresolved: 0 },
+        outcomeDistribution: { agreed: 0, partial: 0, refused: 2, unresolved: 0 },
       },
     });
   });
@@ -501,7 +409,7 @@ describe("难度分层", () => {
     expect(m1.byDifficulty).toEqual({
       cooperative: { n: 2, execAvg: 90 },
       neutral: null,
-      tough: { n: 2, execAvg: 55 },
+      tough: { n: 1, execAvg: 40 },
     });
 
     const m2 = byMethodology.find((row) => row.methodologyId === M2)!;
@@ -517,12 +425,12 @@ describe("难度分层", () => {
 
   it("largestGap：配合档与强硬档差值最大者", () => {
     const { largestGap } = getStatsDifficulty({}, { database: test.db, now: NOW });
-    expect(largestGap).toEqual({ methodologyId: M1, name: "甲方法", gap: 35 });
+    expect(largestGap).toEqual({ methodologyId: M1, name: "甲方法", gap: 50 });
   });
 
   it("筛选与空数据", () => {
     const filtered = getStatsDifficulty({ tagId: tagIdOf("亲密关系") }, { database: test.db, now: NOW });
-    // 只保留所用方法论属于「亲密关系」的练习（乙方法的 2 场）
+    // 只保留目标方法论属于「亲密关系」的练习（乙方法的 2 场）
     expect(filtered.overall.cooperative).toEqual({
       n: 1,
       execAvg: 50,
@@ -550,8 +458,8 @@ describe("最需要练习", () => {
     addMethodology({ id: M2, name: "乙方法", tagNames: ["亲密关系"] });
     addMethodology({ id: M3, name: "丙方法", status: "archived" });
     addMethodology({ id: M4, name: "丁方法", status: "draft" });
-    addSession({ target: M1, mode: "drill", difficulty: "cooperative", at: 1, executionScore: 50 });
-    addSession({ target: M3, mode: "drill", difficulty: "cooperative", at: 2, executionScore: 90 });
+    addSession({ target: M1, difficulty: "cooperative", at: 1, executionScore: 50 });
+    addSession({ target: M3, difficulty: "cooperative", at: 2, executionScore: 90 });
   });
 
   it("只取已确认的方法论，按掌握度升序，默认 3 个", () => {

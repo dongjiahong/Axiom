@@ -1,4 +1,4 @@
-import type { KeyPointVerdictValue, Outcome, PrincipleVerdictValue, Recognition } from "@/domain/schemas";
+import type { KeyPointVerdictValue, Outcome, PrincipleVerdictValue } from "@/domain/schemas";
 
 /** 复盘相关的界面文案（中文，与 CONTEXT.md 术语一致）。 */
 
@@ -25,18 +25,6 @@ export const OUTCOME_LABELS: Record<Outcome, string> = {
   partial: "对方部分让步",
   refused: "对方拒绝了",
   unresolved: "尚无结论",
-};
-
-export const RECOGNITION_LABELS: Record<Recognition, string> = {
-  correct: "正确",
-  partial: "部分正确",
-  wrong: "错误",
-};
-
-export const RECOGNITION_STYLES: Record<Recognition, string> = {
-  correct: "bg-emerald-100 text-emerald-800",
-  partial: "bg-amber-100 text-amber-800",
-  wrong: "bg-red-100 text-red-800",
 };
 
 export const stars = (quality: number | null): string =>

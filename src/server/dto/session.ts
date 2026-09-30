@@ -3,8 +3,6 @@ import { z } from "zod";
 import { MESSAGE_MAX_CHARS } from "@/domain/constants";
 import {
   Difficulty,
-  PracticeMode,
-  Recognition,
   Scope,
   SelectionMode,
   type CounterpartBrief,
@@ -18,24 +16,16 @@ import type { MessageRole, SessionStatus } from "@/server/db/schema";
 
 /**
  * 练习会话的客户端 DTO。
- * 隐藏字段只在 debriefed / debrief_failed 状态下才会出现在结果里（键本身不存在，而不是 null），
- * 综合测验在复盘前也不下发目标方法论与候选方法论的正文。
+ * 隐藏字段只在 debriefed / debrief_failed 状态下才会出现在结果里（键本身不存在，而不是 null）。
  */
 
 export const CreatePracticeInput = z.object({
-  mode: PracticeMode,
   selection: SelectionMode,
   methodologyId: z.string().min(1).optional(),
   scope: Scope,
   difficulty: Difficulty,
 });
 export type CreatePracticeInput = z.infer<typeof CreatePracticeInput>;
-
-export const SelectMethodologyInput = z.object({ methodologyId: z.string().min(1) });
-
-/** 重练同一场景：可选指定模式，省略时沿用该场景上一次练习的模式。 */
-export const RetryScenarioInput = z.object({ mode: PracticeMode.optional() });
-export type RetryScenarioInput = z.infer<typeof RetryScenarioInput>;
 
 /** 历史列表的分页参数。 */
 export const SessionListQuery = z.object({
@@ -117,26 +107,18 @@ export interface MessageResultDto {
   };
 }
 
-export interface CandidateDto {
-  id: string;
-  name: string;
-  tags: string[];
-}
-
 /** 历史列表 / 首页「最近练习」的单条记录。 */
 export interface SessionListItemDto {
   id: string;
   scenarioId: string;
   scenarioTitle: string;
-  mode: PracticeMode;
   difficulty: Difficulty;
   status: SessionStatus;
   createdAt: number;
   endedAt: number | null;
-  /** 所用方法论名称；综合测验在复盘前不下发（页面显示"—"，避免暴露信息）。 */
-  methodologyName: string | null;
+  /** 所用的目标方法论名称。 */
+  methodologyName: string;
   executionScore: number | null;
-  recognition: Recognition | null;
   outcome: Outcome | null;
 }
 
@@ -149,7 +131,6 @@ export interface SessionListDto {
 
 export interface SessionDto {
   id: string;
-  mode: PracticeMode;
   status: SessionStatus;
   difficulty: Difficulty;
   hintUsed: boolean;
@@ -171,26 +152,19 @@ export interface SessionDto {
     openingSpeaker: "counterpart" | "user";
     openingLine: string | null;
   };
-  /** 专项练习创建时 = 目标；综合测验为用户在 briefing 阶段的选择。 */
-  selectedMethodologyId: string | null;
+  targetMethodologyId: string;
+  targetMethodologyName: string;
   messages: SessionMessageDto[];
-  /** 仅综合测验：候选列表，按名称排序，只含 id、名称、标签。 */
-  candidates?: CandidateDto[];
 
-  // 以下键：专项练习始终下发目标；综合测验只在复盘后下发。
-  targetMethodologyId?: string;
-  targetMethodologyName?: string;
   // 以下键只在复盘后（debriefed / debrief_failed）下发。
   brief?: CounterpartBrief;
   designNotes?: string;
-  alternatives?: { methodologyId: string; name: string; reason: string }[];
   targetSkeleton?: MethodologySkeletonDto;
 }
 
 export interface SessionRows {
   session: {
     id: string;
-    mode: PracticeMode;
     status: SessionStatus;
     hintUsed: boolean;
     maxTurns: number;
@@ -199,7 +173,6 @@ export interface SessionRows {
     createdAt: number;
     startedAt: number | null;
     endedAt: number | null;
-    selectedMethodologyId: string | null;
     targetSnapshot: MethodologySnapshot | null;
   };
   scenario: {
@@ -216,7 +189,6 @@ export interface SessionRows {
     openingSpeaker: "counterpart" | "user";
     openingLine: string | null;
     brief: CounterpartBrief;
-    alternatives: { methodologyId: string; reason: string }[];
     designNotes: string;
   };
   messages: {
@@ -227,10 +199,8 @@ export interface SessionRows {
     content: string;
     meta: MessageMeta | null;
   }[];
-  /** 候选方法论（综合测验）。 */
-  candidates: CandidateDto[];
-  /** 方法论 ID → 名称，用于目标与备选方法论。 */
-  names: Map<string, string>;
+  /** 目标方法论名称。 */
+  targetName: string;
 }
 
 /** 单条消息 DTO；`meta` 只在揭晓后下发。 */
@@ -256,7 +226,6 @@ export function toSessionDto(rows: SessionRows): SessionDto {
 
   const dto: SessionDto = {
     id: session.id,
-    mode: session.mode,
     status: session.status,
     difficulty: scenario.difficulty,
     hintUsed: session.hintUsed,
@@ -281,27 +250,14 @@ export function toSessionDto(rows: SessionRows): SessionDto {
       openingSpeaker: scenario.openingSpeaker,
       openingLine: scenario.openingLine,
     },
-    selectedMethodologyId: session.selectedMethodologyId,
+    targetMethodologyId: scenario.targetMethodologyId,
+    targetMethodologyName: rows.targetName,
     messages: rows.messages.map((m) => toMessageDto(m, revealed)),
   };
-
-  if (session.mode === "quiz") {
-    dto.candidates = [...rows.candidates].sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
-  }
-
-  if (session.mode === "drill" || revealed) {
-    dto.targetMethodologyId = scenario.targetMethodologyId;
-    dto.targetMethodologyName = rows.names.get(scenario.targetMethodologyId) ?? "";
-  }
 
   if (revealed) {
     dto.brief = scenario.brief;
     dto.designNotes = scenario.designNotes;
-    dto.alternatives = scenario.alternatives.map((alt) => ({
-      methodologyId: alt.methodologyId,
-      name: rows.names.get(alt.methodologyId) ?? "",
-      reason: alt.reason,
-    }));
     if (session.targetSnapshot) {
       dto.targetSkeleton = toSkeletonDto(session.targetSnapshot.name, session.targetSnapshot.body);
     }

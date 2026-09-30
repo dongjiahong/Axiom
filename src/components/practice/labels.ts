@@ -1,17 +1,7 @@
-import type { Difficulty, PracticeMode } from "@/domain/schemas";
+import type { Difficulty } from "@/domain/schemas";
 import type { SessionStatus } from "@/server/db/schema";
 
 /** 练习相关的界面文案（中文，与 CONTEXT.md 术语一致）。 */
-
-export const MODE_LABELS: Record<PracticeMode, string> = {
-  drill: "专项练习",
-  quiz: "综合测验",
-};
-
-export const MODE_DESCRIPTIONS: Record<PracticeMode, string> = {
-  drill: "目标方法论对你可见，只评判执行；对话中可以展开查看方法论骨架。",
-  quiz: "目标方法论对你隐藏，开场前自己选择要用的方法论，同时评判识别与执行。",
-};
 
 export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   cooperative: "配合",
@@ -24,6 +14,20 @@ export const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
   neutral: "对方有自己的立场和顾虑，需要较完整地执行要点才会让步。",
   tough: "对方强势或情绪化，会反复施压、质疑，只有高质量执行才可能换来部分让步。",
 };
+
+/** 生成场景期间，全屏等待遮罩里轮播的阶段文案（大致按生成的先后顺序，不代表真实进度）。 */
+export const SCENARIO_LOADING_MESSAGES = [
+  "正在读一遍方法论骨架……",
+  "正在搭建场景……",
+  "设定对方性格……",
+  "安排你和对方的身份关系……",
+  "给对方一个不好松口的立场……",
+  "埋下计划阻力……",
+  "酝酿对方的开场情绪……",
+  "编写开场白……",
+  "检查有没有泄露步骤……",
+  "最后通读一遍，看合不合理……",
+];
 
 export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
   briefing: "准备中",

@@ -4,7 +4,7 @@ import {
   RESISTANCE_COUNT_RANGE,
   SCENARIO_LEAK_MIN_STEP_TITLE_CHARS,
 } from "@/domain/constants";
-import type { Difficulty, MethodologyBody, PracticeMode } from "@/domain/schemas";
+import type { Difficulty, MethodologyBody } from "@/domain/schemas";
 import { normalize } from "@/domain/text-match";
 import type { ChatMessage } from "@/server/llm/client";
 import type { TaskDef } from "@/server/llm/run-task";
@@ -14,7 +14,6 @@ import { outputFormatPrompt } from "./common";
 /** 任务四：场景生成 `scenario`。 */
 
 export interface ScenarioInput {
-  mode: PracticeMode;
   difficulty: Difficulty;
   target: {
     name: string;
@@ -25,13 +24,6 @@ export interface ScenarioInput {
     steps: { ref: string; title: string; conditional: boolean; trigger: string | null }[];
     principles: string[];
   };
-  /** 范围内其余已确认方法论。 */
-  others: {
-    ref: string;
-    name: string;
-    applicability: string[];
-    counterIndications: string[];
-  }[];
   /** 该目标方法论最近的场景标题，避免重复。 */
   recentTitles: string[];
 }
@@ -64,7 +56,6 @@ export const ScenarioOutput = z.object({
     yieldConditions: z.string(),
     breakdownConditions: z.string(),
   }),
-  alternatives: z.array(z.object({ ref: z.string(), reason: z.string() })),
   designNotes: z.string(),
 });
 export type ScenarioOutput = z.infer<typeof ScenarioOutput>;
@@ -72,24 +63,20 @@ export type ScenarioOutput = z.infer<typeof ScenarioOutput>;
 // ───────────── 短引用 ─────────────
 
 export const stepRef = (index: number) => `s${index + 1}`;
-export const methodologyRef = (index: number) => `m${index + 1}`;
 
 interface MethodologyLike {
   name: string;
   body: MethodologyBody;
 }
 
-/** 由方法论正文构造任务输入；步骤引用 `s1..`，其余方法论引用 `m1..`（顺序即 others 的顺序）。 */
+/** 由方法论正文构造任务输入；步骤引用 `s1..`。 */
 export function buildScenarioInput(params: {
-  mode: PracticeMode;
   difficulty: Difficulty;
   target: MethodologyLike;
-  others: MethodologyLike[];
   recentTitles: string[];
 }): ScenarioInput {
-  const { target, others } = params;
+  const { target } = params;
   return {
-    mode: params.mode,
     difficulty: params.difficulty,
     target: {
       name: target.name,
@@ -105,12 +92,6 @@ export function buildScenarioInput(params: {
       })),
       principles: target.body.principles.map((p) => p.text),
     },
-    others: others.map((m, i) => ({
-      ref: methodologyRef(i),
-      name: m.name,
-      applicability: m.body.applicability.map((item) => item.text),
-      counterIndications: m.body.counterIndications.map((item) => item.text),
-    })),
     recentTitles: params.recentTitles,
   };
 }
@@ -136,7 +117,6 @@ const SCHEMA_DESCRIPTION = `{
     "yieldConditions": string,
     "breakdownConditions": string
   },
-  "alternatives": { "ref": string, "reason": string }[],   // ref 来自 others 中的引用（如 "m2"）；没有则为空数组
   "designNotes": string                   // 为什么目标方法论最适合这个场景
 }`;
 
@@ -149,19 +129,13 @@ const DIFFICULTY_TEXT: Record<Difficulty, string> = {
 };
 
 function systemPrompt(input: ScenarioInput): string {
-  const quiz = input.mode === "quiz";
   const recent =
     input.recentTitles.length > 0 ? input.recentTitles.map((t) => `「${t}」`).join("、") : "（暂无）";
   const principles = [
     "1. 场景必须满足目标方法论的适用条件，且不落入它的反例。",
-    ...(quiz
-      ? [
-          "2. 这是综合测验，用户看不到目标方法论，要自己判断该用哪个方法。请让场景特征能区分目标方法论与其他候选方法论：尽量让其他候选的适用条件不满足、或落入它们的反例。确实同样适用的候选，列入 alternatives 并说明理由；不要滥标。",
-        ]
-      : []),
-    `${quiz ? 3 : 2}. 可见内容（title、background、userRole、userGoal、counterpart、openingLine）中不得出现任何方法论的名称、步骤名称，也不得暗示做法（如"你应该先认同对方"）。userGoal 只写想达成什么，不写怎么做。`,
-    `${quiz ? 4 : 3}. background 用第二人称"你"，150–300 字，写清人物关系、事件经过、利害得失和此刻的情境，细节具体、贴近中国职场与生活。`,
-    `${quiz ? 5 : 4}. 避免与这些已有场景雷同：${recent}`,
+    "2. 可见内容（title、background、userRole、userGoal、counterpart、openingLine）中不得出现方法论的名称、步骤名称，也不得暗示做法（如\"你应该先认同对方\"）。userGoal 只写想达成什么，不写怎么做。",
+    "3. background 用第二人称\"你\"，150–300 字，写清人物关系、事件经过、利害得失和此刻的情境，细节具体、贴近中国职场与生活。",
+    `4. 避免与这些已有场景雷同：${recent}`,
   ];
   return `你是沟通训练的情景设计师。请根据"目标方法论"设计一个练习场景：用户将扮演场景中的"你"，与由 AI 扮演的对方进行多轮对话。
 
@@ -176,7 +150,7 @@ ${principles.join("\n")}
 
 【难度：${DIFFICULTY_TEXT[input.difficulty]}】
 
-【designNotes】说明为什么目标方法论最适合这个场景${quiz ? "，以及它与最容易混淆的候选方法论的区别" : ""}。这段内容在复盘时展示给用户。
+【designNotes】说明为什么目标方法论最适合这个场景。这段内容在复盘时展示给用户。
 
 ${outputFormatPrompt(SCHEMA_DESCRIPTION)}`;
 }
@@ -186,7 +160,7 @@ function build(input: ScenarioInput): ChatMessage[] {
     { role: "system", content: systemPrompt(input) },
     {
       role: "user",
-      content: JSON.stringify({ target: input.target, others: input.others }, null, 1),
+      content: JSON.stringify({ target: input.target }, null, 1),
     },
   ];
 }
@@ -250,17 +224,9 @@ export function validateScenario(output: ScenarioOutput, input: ScenarioInput): 
     }
   }
 
-  const otherRefs = new Set(input.others.map((o) => o.ref));
-  output.alternatives.forEach((alt, i) => {
-    if (!otherRefs.has(alt.ref)) {
-      errors.push(`alternatives[${i}].ref：「${alt.ref}」不在 others 的引用中`);
-    }
-  });
-
-  // 可见字段不得泄露任何方法论名称或步骤标题
+  // 可见字段不得泄露方法论名称或步骤标题
   const forbidden: [label: string, value: string][] = [
     ["目标方法论名称", input.target.name],
-    ...input.others.map((o): [string, string] => ["其他方法论名称", o.name]),
     ...input.target.steps
       .filter((s) => normalize(s.title).length >= SCENARIO_LEAK_MIN_STEP_TITLE_CHARS)
       .map((s): [string, string] => ["步骤名称", s.title]),
@@ -297,7 +263,6 @@ function fake(input: ScenarioInput): ScenarioOutput {
     });
   }
 
-  const alternative = input.mode === "quiz" ? input.others[0] : undefined;
   return {
     title: `示例场景 ${input.recentTitles.length + 1}`,
     background:
@@ -315,16 +280,13 @@ function fake(input: ScenarioInput): ScenarioOutput {
       yieldConditions: "对方把事情讲清楚并考虑到自己的处境时会让步。",
       breakdownConditions: "对方态度强硬或回避问题时会拒绝到底。",
     },
-    alternatives: alternative
-      ? [{ ref: alternative.ref, reason: "该场景同样符合这个方法论的适用条件。" }]
-      : [],
     designNotes: "目标方法论的适用条件与本场景一致：双方关系熟悉、事情明确、需要当面沟通。",
   };
 }
 
 export const scenarioTask: TaskDef<ScenarioInput, ScenarioOutput> = {
   name: "scenario",
-  promptVersion: "scenario@1",
+  promptVersion: "scenario@2",
   temperature: 0.9,
   schema: ScenarioOutput,
   build,

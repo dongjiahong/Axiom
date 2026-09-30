@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { Difficulty, Outcome, PracticeMode } from "@/domain/schemas";
+import type { Difficulty, Outcome } from "@/domain/schemas";
 import type { MethodologyStatus } from "@/server/db/schema";
 
 /** 统计的客户端 DTO。 */
@@ -16,7 +16,6 @@ export interface ExecTrendPointDto {
   endedAt: number;
   executionScore: number;
   difficulty: Difficulty;
-  mode: PracticeMode;
   hintUsed: boolean;
 }
 
@@ -27,29 +26,16 @@ export interface MethodologyOverviewDto {
   /** 已归档的方法论如有历史练习也会列出，标「已归档」。 */
   status: MethodologyStatus;
   tags: string[];
-  /** 作为所用方法论的专项练习 / 综合测验场数。 */
-  drillCount: number;
-  quizCount: number;
+  /** 作为目标方法论的练习场数。 */
+  practiceCount: number;
   execAvgAll: number | null;
   execAvgRecent: number | null;
   execAvgWithHint: number | null;
   execAvgWithoutHint: number | null;
   /** 按时间正序，最近 STATS_TREND_LIMIT 场。 */
   execTrend: ExecTrendPointDto[];
-  recognitionAccuracy: number | null;
-  recognitionN: number;
   mastery: number;
   lastPracticedAt: number | null;
-}
-
-/** 识别混淆的一行：目标方法论 X 被误选为 Y。 */
-export interface ConfusionRowDto {
-  targetId: string;
-  targetName: string;
-  selectedId: string;
-  selectedName: string;
-  wrongCount: number;
-  partialCount: number;
 }
 
 /** 单个难度档的统计。 */

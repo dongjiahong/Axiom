@@ -1,12 +1,7 @@
 import { z } from "zod";
 
 import { EVIDENCE_QUOTE_CHARS } from "@/domain/constants";
-import type {
-  CounterpartBrief,
-  MethodologyBody,
-  MethodologySnapshot,
-  Recognition,
-} from "@/domain/schemas";
+import type { CounterpartBrief, MethodologyBody, MethodologySnapshot } from "@/domain/schemas";
 import type { ChatMessage } from "@/server/llm/client";
 import type { TaskDef } from "@/server/llm/run-task";
 
@@ -15,7 +10,6 @@ import { outputFormatPrompt } from "./common";
 /** 任务六：复盘 `debrief`。 */
 
 export interface DebriefInput {
-  mode: "drill" | "quiz";
   scenario: {
     title: string;
     background: string;
@@ -33,7 +27,7 @@ export interface DebriefInput {
     };
     designNotes: string;
   };
-  /** 用户所用（drill 即目标）方法论快照，短引用。 */
+  /** 用户所用（即目标）方法论快照，短引用。 */
   selected: {
     name: string;
     goal: string;
@@ -48,16 +42,6 @@ export interface DebriefInput {
     }[];
     principles: { ref: string; kind: "do" | "dont"; text: string }[];
     concepts: { ref: string; name: string; explanation: string }[];
-  };
-  /** 仅 quiz：结果已由代码算出，AI 只负责解释。 */
-  recognition?: {
-    result: Recognition;
-    selectedName: string;
-    selectedApplicability: string[];
-    selectedCounterIndications: string[];
-    targetName: string;
-    targetApplicability: string[];
-    alternativeNames: string[];
   };
   /** `[第0轮·对方] ……` / `[第1轮·你] ……` 逐行。 */
   transcript: string;
@@ -99,7 +83,6 @@ export const DebriefOutput = z.object({
     result: z.enum(["agreed", "partial", "refused", "unresolved"]),
     note: z.string(),
   }),
-  recognitionExplanation: z.string().nullable(),
   summary: z.object({
     strengths: z.array(z.string()).max(3),
     improvements: z.array(z.string()).min(1).max(3),
@@ -202,15 +185,8 @@ const SCHEMA_DESCRIPTION = `{
   }[],
   "holistic": { "score": number, "comment": string },    // score 为 0–100 的整数
   "outcome": { "result": "agreed" | "partial" | "refused" | "unresolved", "note": string },
-  "recognitionExplanation": string?,      // 综合测验必填，专项练习为 null
   "summary": { "strengths": string[], "improvements": string[] }   // strengths 0–3 条，improvements 1–3 条
 }`;
-
-function recognitionInstruction(input: DebriefInput): string {
-  if (input.mode === "drill" || !input.recognition) return "输出 null。";
-  const r = input.recognition;
-  return `用户在开场前选择了「${r.selectedName}」，本场景的目标方法论是「${r.targetName}」，识别结果为 ${r.result}。请结合场景特征，解释为什么目标方法论最适合，以及用户所选方法论与场景哪里匹配、哪里不匹配（依据适用条件与反例）。`;
-}
 
 function systemPrompt(input: DebriefInput): string {
   return `你是一位严格、具体、建设性的沟通教练。用户刚完成一场沟通练习，请依据方法论骨架逐项评判。
@@ -233,7 +209,6 @@ function systemPrompt(input: DebriefInput): string {
 - holistic：0–100 的整体印象分，综合自然度、情绪把控、关系维护，并用一两句话说明。
 - outcome：对方最终的态度，agreed（答应）/ partial（部分让步）/ refused（拒绝）/ unresolved（未有结论），note 一句话说明。
 - 执行判定与说服结果相互独立：不要因为对方答应了就放宽判定，也不要因为对方拒绝就收紧判定。
-- recognitionExplanation：${recognitionInstruction(input)}
 - summary：strengths 为 0–3 条做得好的地方；improvements 为 1–3 条最重要的改进点，最重要的放在最前面。
 
 ${outputFormatPrompt(SCHEMA_DESCRIPTION)}`;
@@ -243,7 +218,6 @@ function userPrompt(input: DebriefInput): string {
   const sections = [
     ["场景（含对方角色卡与设计说明）", JSON.stringify(input.scenario, null, 1)],
     ["方法论骨架", JSON.stringify(input.selected, null, 1)],
-    ...(input.recognition ? [["识别信息", JSON.stringify(input.recognition, null, 1)]] : []),
     [
       "对方阻力触发记录",
       input.firedResistance.length > 0 ? JSON.stringify(input.firedResistance, null, 1) : "（对方没有触发任何计划阻力）",
@@ -320,14 +294,6 @@ export function validateDebrief(output: DebriefOutput, input: DebriefInput): str
     if (!seenPrinciples.has(ref)) errors.push(`principleVerdicts：缺少原则「${ref}」的判定`);
   }
 
-  if (input.mode === "quiz") {
-    if (!output.recognitionExplanation?.trim()) {
-      errors.push("recognitionExplanation：综合测验必须给出识别解释");
-    }
-  } else if (output.recognitionExplanation !== null) {
-    errors.push("recognitionExplanation：专项练习必须为 null");
-  }
-
   return errors;
 }
 
@@ -398,17 +364,13 @@ function fake(input: DebriefInput): DebriefOutput {
     })),
     holistic: { score: FAKE_HOLISTIC_SCORE, comment: "整体表达自然，仍有改进空间。" },
     outcome: { result: "unresolved", note: "对话结束时对方还没有明确态度。" },
-    recognitionExplanation:
-      input.mode === "quiz" && input.recognition
-        ? `本场景的目标方法论是「${input.recognition.targetName}」，你选择了「${input.recognition.selectedName}」。场景特征与目标方法论的适用条件更吻合。`
-        : null,
     summary: { strengths: ["开场清楚"], improvements: ["补全遗漏的要点"] },
   };
 }
 
 export const debriefTask: TaskDef<DebriefInput, DebriefOutput> = {
   name: "debrief",
-  promptVersion: "debrief@1",
+  promptVersion: "debrief@2",
   temperature: 0.2,
   schema: DebriefOutput,
   build,

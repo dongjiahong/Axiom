@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 
-import { RECOGNITION_LABELS } from "@/components/debrief/labels";
-import { DIFFICULTY_LABELS, MODE_LABELS, SESSION_STATUS_LABELS } from "@/components/practice/labels";
+import { DIFFICULTY_LABELS, SESSION_STATUS_LABELS } from "@/components/practice/labels";
 import { RetryButton } from "@/components/practice/practice-actions";
 import { formatDateTime } from "@/components/sources/labels";
 import { formatScore, OUTCOME_SHORT_LABELS } from "@/components/stats/labels";
@@ -66,15 +65,13 @@ function SessionCards({ items }: { items: SessionListItemDto[] }) {
           </div>
           <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-xs">
             <span>{formatDateTime(item.createdAt)}</span>
-            <span>{MODE_LABELS[item.mode]}</span>
             <span>难度：{DIFFICULTY_LABELS[item.difficulty]}</span>
           </div>
-          {item.methodologyName ? <p className="text-xs">方法论：{item.methodologyName}</p> : null}
+          <p className="text-xs">方法论：{item.methodologyName}</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
             <span>
               执行分 <b className="tabular-nums">{formatScore(item.executionScore)}</b>
             </span>
-            {item.recognition !== null ? <span>识别：{RECOGNITION_LABELS[item.recognition]}</span> : null}
             {item.outcome !== null ? <span>说服结果：{OUTCOME_SHORT_LABELS[item.outcome]}</span> : null}
           </div>
           <div className="flex justify-end gap-2">
@@ -97,11 +94,9 @@ function SessionsDesktopTable({ items }: { items: SessionListItemDto[] }) {
           <TableRow>
             <TableHead>时间</TableHead>
             <TableHead>场景</TableHead>
-            <TableHead>模式</TableHead>
             <TableHead>难度</TableHead>
-            <TableHead>所用方法论</TableHead>
+            <TableHead>目标方法论</TableHead>
             <TableHead className="text-right">执行分</TableHead>
-            <TableHead>识别</TableHead>
             <TableHead>说服结果</TableHead>
             <TableHead>状态</TableHead>
             <TableHead />
@@ -118,14 +113,10 @@ function SessionsDesktopTable({ items }: { items: SessionListItemDto[] }) {
                   {item.scenarioTitle}
                 </Link>
               </TableCell>
-              <TableCell>{MODE_LABELS[item.mode]}</TableCell>
               <TableCell>{DIFFICULTY_LABELS[item.difficulty]}</TableCell>
-              <TableCell>{item.methodologyName ?? "—"}</TableCell>
+              <TableCell>{item.methodologyName}</TableCell>
               <TableCell className="text-right tabular-nums">
                 {formatScore(item.executionScore)}
-              </TableCell>
-              <TableCell>
-                {item.recognition === null ? "—" : RECOGNITION_LABELS[item.recognition]}
               </TableCell>
               <TableCell>
                 {item.outcome === null ? "—" : OUTCOME_SHORT_LABELS[item.outcome]}
@@ -158,7 +149,6 @@ export function RecentSessions({ items }: { items: SessionListItemDto[] }) {
           <Link href={sessionHref(item)} className="min-w-0 flex-1 truncate font-medium hover:underline">
             {item.scenarioTitle}
           </Link>
-          <span className="text-muted-foreground">{MODE_LABELS[item.mode]}</span>
           <span className="text-muted-foreground">{DIFFICULTY_LABELS[item.difficulty]}</span>
           <span className="text-muted-foreground tabular-nums">
             执行分 {formatScore(item.executionScore)}

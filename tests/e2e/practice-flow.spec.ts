@@ -4,14 +4,13 @@ import { expect, test, type Page } from "playwright/test";
 
 /**
  * 端到端流程（AXIOM_FAKE_LLM=1，数据目录由 playwright.config.ts 每次重建）。
- * 覆盖：导入资料 → 抽取 → 确认方法论 → 专项练习 → 复盘改判 → 统计；综合测验 → 复盘识别。
+ * 覆盖：导入资料 → 抽取 → 确认方法论 → 专项练习 → 复盘改判 → 统计。
  */
 
 const TXT_FIXTURE = path.join(__dirname, "../fixtures/sample-gbk.txt");
 const METHODOLOGY_NAME = "E2E 练习方法论";
 const FIRST_MESSAGE = "我想和你聊聊这次加薪的事情，先说明我的来意。";
 const SECOND_MESSAGE = "我今年负责了两个重点项目，希望薪资能调整到一万五。";
-const QUIZ_MESSAGE = "我先说说我看到的证据和我的判断。";
 
 /** 导航并等页面加载完成（dev 模式首访需要编译，客户端水合后才能交互）。 */
 async function open(page: Page, url: string) {
@@ -56,8 +55,8 @@ test("专项练习：导入 → 抽取 → 确认 → 练习 → 复盘改判 �
   await expect(page.getByRole("button", { name: "退回候选" })).toBeVisible({ timeout: 20_000 });
 
   // 4. 新建专项练习（指定刚确认的方法论）
-  await open(page, "/practice/new?mode=drill");
-  await page.getByLabel("搜索方法论名称").fill(METHODOLOGY_NAME);
+  await open(page, "/practice/new");
+  await page.getByPlaceholder("搜索方法论名称").fill(METHODOLOGY_NAME);
   await page.locator("label").filter({ hasText: METHODOLOGY_NAME }).click();
   await page.getByRole("button", { name: "生成场景" }).click();
 
@@ -73,38 +72,19 @@ test("专项练习：导入 → 抽取 → 确认 → 练习 → 复盘改判 �
   await expect(page.getByText("第 2 / 12 轮")).toBeVisible();
   await endAndWaitForDebrief(page);
 
-  // 7. 复盘页显示执行分，改判一条要点
+  // 7. 复盘页显示执行分与场景设计说明，改判一条要点
   await expect(page.getByTestId("execution-score")).toBeVisible();
+  await expect(page.getByText("场景设计说明")).toBeVisible();
   await page.getByRole("button", { name: "改判", exact: true }).first().click();
   await page.getByRole("button", { name: "未做到", exact: true }).click();
   await page.getByPlaceholder("改判理由（必填）").fill("E2E：这条要点确实没有做到。");
   await page.getByRole("button", { name: "保存改判" }).click();
   await expect(page.getByText("已改判").first()).toBeVisible();
 
-  // 8. 统计页出现这 1 场专项练习
+  // 8. 统计页出现这 1 场练习
   await open(page, "/stats");
   const row = page.getByRole("row").filter({ hasText: METHODOLOGY_NAME });
-  await expect(row).toContainText("1 / 0");
+  await expect(row.locator("td").nth(2)).toHaveText("1");
 });
 
-test("综合测验：选择方法论 → 对话 → 复盘显示识别结果", async ({ page }) => {
-  await open(page, "/practice/new?mode=quiz");
-  await expect(page.getByText(/范围内共/)).toBeVisible();
-  await page.getByRole("button", { name: "生成场景" }).click();
 
-  // 开场前从候选中选择一个方法论（briefing 页只有候选这一个单选组）
-  await expect(page.getByText("选择你要使用的方法论")).toBeVisible({ timeout: 30_000 });
-  const candidate = page.getByRole("radiogroup").getByRole("radio").first();
-  await candidate.click();
-  await expect(candidate).toHaveAttribute("aria-checked", "true");
-  await page.getByRole("button", { name: "开始对话" }).click();
-
-  await sendMessage(page, QUIZ_MESSAGE);
-  await endAndWaitForDebrief(page);
-
-  // 复盘页显示识别结果与解释
-  await expect(page.getByTestId("execution-score")).toBeVisible();
-  await expect(page.getByText(/你选择的：/)).toBeVisible();
-  await expect(page.getByText("场景设计说明")).toBeVisible();
-  await expect(page.locator("span").filter({ hasText: /^(正确|部分正确|错误)$/ }).first()).toBeVisible();
-});

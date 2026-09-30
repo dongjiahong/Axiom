@@ -90,19 +90,14 @@ export type MethodologySnapshot = z.infer<typeof MethodologySnapshot>;
 export const Difficulty = z.enum(["cooperative", "neutral", "tough"]);
 export type Difficulty = z.infer<typeof Difficulty>;
 
-/** 练习模式：专项练习 / 综合测验。 */
-export const PracticeMode = z.enum(["drill", "quiz"]);
-export type PracticeMode = z.infer<typeof PracticeMode>;
-
 /** 选题方式：指定 / 随机。 */
 export const SelectionMode = z.enum(["pick", "random"]);
 export type SelectionMode = z.infer<typeof SelectionMode>;
 
-/** 选题范围：三者取并集，全空表示整个方法论库。 */
+/** 选题范围：标签全部命中，资料可选其一；全空表示整个方法论库。 */
 export const Scope = z.object({
   tagIds: z.array(z.string()),
   sourceIds: z.array(z.string()),
-  methodologyIds: z.array(z.string()),
 });
 export type Scope = z.infer<typeof Scope>;
 
@@ -126,10 +121,6 @@ export const CounterpartBrief = z.object({
 });
 export type CounterpartBrief = z.infer<typeof CounterpartBrief>;
 
-/** 备选方法论：同样适用于该场景但不是目标的方法论。 */
-export const Alternative = z.object({ methodologyId: z.string(), reason: z.string() });
-export type Alternative = z.infer<typeof Alternative>;
-
 /** 证据：判定所引用的用户原话。 */
 export const Evidence = z.object({
   turn: z.number().int().min(1),
@@ -145,10 +136,6 @@ export type KeyPointVerdictValue = z.infer<typeof KeyPointVerdictValue>;
 /** 原则判定：遵守 / 违反。 */
 export const PrincipleVerdictValue = z.enum(["kept", "violated"]);
 export type PrincipleVerdictValue = z.infer<typeof PrincipleVerdictValue>;
-
-/** 识别结果：正确 / 部分正确 / 错误。 */
-export const Recognition = z.enum(["correct", "partial", "wrong"]);
-export type Recognition = z.infer<typeof Recognition>;
 
 /** 说服结果。 */
 export const Outcome = z.enum(["agreed", "partial", "refused", "unresolved"]);

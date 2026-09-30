@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpenCheck, Target } from "lucide-react";
+import { Target } from "lucide-react";
 
 import { LLMNotConfiguredBanner } from "@/components/common/llm-not-configured-banner";
 import { RecentSessions } from "@/components/history/sessions-table";
@@ -13,20 +13,13 @@ import { listWeakestMethodologies } from "@/server/services/stats";
 
 export const dynamic = "force-dynamic";
 
-const ENTRIES = [
-  {
-    href: "/practice/new?mode=drill",
-    icon: Target,
-    title: "专项练习",
-    description: "目标方法论对你可见，只评判执行；对话中可以展开查看方法论骨架。",
-  },
-  {
-    href: "/practice/new?mode=quiz",
-    icon: BookOpenCheck,
-    title: "综合测验",
-    description: "目标方法论对你隐藏，开场前自己选择要用的方法论，同时评判识别与执行。",
-  },
-] as const;
+const ENTRY = {
+  href: "/practice/new",
+  icon: Target,
+  title: "专项练习",
+  description:
+    "按标签与资料筛选出方法论，指定一个或随机抽取；对话中可以展开查看方法论骨架，结束后评判执行。",
+} as const;
 
 export default function HomePage() {
   const weakest = listWeakestMethodologies();
@@ -42,21 +35,19 @@ export default function HomePage() {
         </p>
       </div>
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        {ENTRIES.map((entry) => (
-          <Card key={entry.href}>
-            <CardContent className="flex h-full flex-col items-start gap-3 py-4">
-              <div className="flex items-center gap-2">
-                <entry.icon className="size-4" />
-                <CardTitle className="text-base">{entry.title}</CardTitle>
-              </div>
-              <CardDescription className="flex-1">{entry.description}</CardDescription>
-              <Button size="sm" asChild>
-                <Link href={entry.href}>开始{entry.title}</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+      <section>
+        <Card>
+          <CardContent className="flex h-full flex-col items-start gap-3 py-4">
+            <div className="flex items-center gap-2">
+              <ENTRY.icon className="size-4" />
+              <CardTitle className="text-base">{ENTRY.title}</CardTitle>
+            </div>
+            <CardDescription className="flex-1">{ENTRY.description}</CardDescription>
+            <Button size="sm" asChild>
+              <Link href={ENTRY.href}>开始{ENTRY.title}</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </section>
 
       <WeakestMethodologies items={weakest} />

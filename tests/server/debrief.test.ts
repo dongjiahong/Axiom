@@ -14,7 +14,6 @@ import {
   verdicts,
 } from "@/server/db/schema";
 import { OverrideInput } from "@/server/dto/debrief";
-import type { CreatePracticeInput } from "@/server/dto/session";
 import { ApiError } from "@/server/http";
 import { LLMUnavailableError } from "@/server/llm/errors";
 import { debriefTask, type DebriefInput, type DebriefOutput } from "@/server/prompts/debrief";
@@ -29,7 +28,6 @@ import {
   createPractice,
   endSession,
   getSession,
-  selectMethodology,
   sendMessage,
   startSession,
 } from "@/server/services/practice";
@@ -113,54 +111,23 @@ function addMethodology(name: string, orderMode: "strict" | "loose" = "strict"):
   return id;
 }
 
-const emptyScope = { tagIds: [], sourceIds: [], methodologyIds: [] };
+const emptyScope = { tagIds: [], sourceIds: [] };
 
 async function talk(sessionId: string, lines = USER_LINES): Promise<void> {
   for (const line of lines) await sendMessage(sessionId, line, { database: test.db });
   endSession(sessionId, test.db);
 }
 
-/** 一场已结束、尚未复盘的专项练习。 */
+/** 一场已结束、尚未复盘的练习。 */
 async function endedDrill(orderMode: "strict" | "loose" = "strict"): Promise<string> {
   const methodologyId = addMethodology("向领导提加薪", orderMode);
   const { sessionId } = await createPractice(
-    {
-      mode: "drill",
-      selection: "pick",
-      methodologyId,
-      scope: { ...emptyScope, methodologyIds: [methodologyId] },
-      difficulty: "neutral",
-    },
+    { selection: "pick", methodologyId, scope: emptyScope, difficulty: "neutral" },
     { database: test.db },
   );
   startSession(sessionId, test.db);
   await talk(sessionId);
   return sessionId;
-}
-
-/** 一场已结束的综合测验：`pick` 决定用户选目标、备选还是无关的方法论。 */
-async function endedQuiz(pick: "target" | "alternative" | "other"): Promise<{ sessionId: string; ids: string[] }> {
-  const ids = [addMethodology("方法甲"), addMethodology("方法乙"), addMethodology("方法丙")];
-  const params: CreatePracticeInput = {
-    mode: "quiz",
-    selection: "random",
-    scope: { ...emptyScope, methodologyIds: ids },
-    difficulty: "neutral",
-  };
-  const { sessionId } = await createPractice(params, { database: test.db });
-  const session = test.db.select().from(practiceSessions).where(eq(practiceSessions.id, sessionId)).get()!;
-  const scenario = test.db.select().from(scenarios).where(eq(scenarios.id, session.scenarioId)).get()!;
-  const alternativeId = scenario.alternatives[0].methodologyId;
-  const chosen =
-    pick === "target"
-      ? scenario.targetMethodologyId
-      : pick === "alternative"
-        ? alternativeId
-        : ids.find((id) => id !== scenario.targetMethodologyId && id !== alternativeId)!;
-  selectMethodology(sessionId, chosen, test.db);
-  startSession(sessionId, test.db);
-  await talk(sessionId);
-  return { sessionId, ids };
 }
 
 function rowsOf(sessionId: string) {
@@ -170,8 +137,7 @@ function rowsOf(sessionId: string) {
 }
 
 function snapshotBody(sessionId: string): MethodologyBody {
-  return test.db.select().from(practiceSessions).where(eq(practiceSessions.id, sessionId)).get()!.selectedSnapshot!
-    .body;
+  return test.db.select().from(practiceSessions).where(eq(practiceSessions.id, sessionId)).get()!.targetSnapshot!.body;
 }
 
 /** 以 fake 输出为底稿，按需修改后作为桩返回。 */
@@ -198,7 +164,7 @@ async function expectApiError(promise: Promise<unknown> | (() => unknown), statu
   throw new Error(`期望抛出 ${status} 错误，但没有抛出`);
 }
 
-describe("Fake 模式复盘（专项练习）", () => {
+describe("Fake 模式复盘", () => {
   it("verdicts 数量 = 要点数 + 原则数；会话变为 debriefed", async () => {
     const sessionId = await endedDrill();
     const dto = await generateDebrief(sessionId, { database: test.db });
@@ -209,13 +175,11 @@ describe("Fake 模式复盘（专项练习）", () => {
     expect(rows).toHaveLength(keyPointCount + b.principles.length);
     expect(rows.filter((r) => r.kind === "key_point")).toHaveLength(keyPointCount);
     expect(statusOf(sessionId)).toBe("debriefed");
-    expect(debrief.recognition).toBeNull();
-    expect(debrief.recognitionExplanation).toBeNull();
-    expect(debrief.promptVersion).toBe("debrief@1");
-    expect(dto.recognition).toBeNull();
+    expect(debrief.promptVersion).toBe("debrief@2");
     expect(dto.steps).toHaveLength(3);
     expect(dto.principles).toHaveLength(2);
     expect(dto.session.status).toBe("debriefed");
+    expect(dto.selected.name).toBe("向领导提加薪");
   });
 
   it("执行分：2 个 done（质量 4）+ 2 个 missed，条件步骤未触发被排除", async () => {
@@ -243,13 +207,7 @@ describe("Fake 模式复盘（专项练习）", () => {
   it("状态限制：进行中 409；已复盘再复盘 409；GET 未复盘 404", async () => {
     const methodologyId = addMethodology("向领导提加薪");
     const { sessionId } = await createPractice(
-      {
-        mode: "drill",
-        selection: "pick",
-        methodologyId,
-        scope: { ...emptyScope, methodologyIds: [methodologyId] },
-        difficulty: "neutral",
-      },
+      { selection: "pick", methodologyId, scope: emptyScope, difficulty: "neutral" },
       { database: test.db },
     );
     await expectApiError(generateDebrief(sessionId, { database: test.db }), 409); // briefing
@@ -512,56 +470,26 @@ describe("改判与撤销改判", () => {
   });
 });
 
-describe("综合测验复盘", () => {
-  it.each([
-    ["target", "correct"],
-    ["alternative", "partial"],
-    ["other", "wrong"],
-  ] as const)("选择%s → 识别 %s", async (pick, expected) => {
-    const { sessionId } = await endedQuiz(pick);
-    const dto = await generateDebrief(sessionId, { database: test.db });
-    expect(dto.recognition?.result).toBe(expected);
-    expect(dto.recognition?.explanation).not.toBe("");
-    expect(rowsOf(sessionId).debrief.recognition).toBe(expected);
-  });
-
-  it("执行按所选方法论评判", async () => {
-    const { sessionId } = await endedQuiz("other");
-    const dto = await generateDebrief(sessionId, { database: test.db });
-    const session = test.db.select().from(practiceSessions).where(eq(practiceSessions.id, sessionId)).get()!;
-    expect(dto.selected.methodologyId).toBe(session.selectedMethodologyId);
-    expect(dto.selected.methodologyId).not.toBe(session.targetSnapshot!.methodologyId);
-  });
-
-  it("复盘前看不到隐藏字段，复盘后 GET 会话能看到", async () => {
-    const { sessionId } = await endedQuiz("target");
+describe("隐藏字段的揭晓", () => {
+  it("复盘前不下发角色卡、设计说明、目标骨架与消息 meta", async () => {
+    const sessionId = await endedDrill();
     const before = JSON.stringify(getSession(sessionId, test.db));
-    for (const key of ["targetMethodologyId", "alternatives", "designNotes", "brief"]) {
+    for (const key of ["brief", "designNotes", "targetSkeleton", "meta"]) {
       expect(before).not.toContain(`"${key}"`);
     }
 
     await generateDebrief(sessionId, { database: test.db });
     const after = getSession(sessionId, test.db);
     expect(after.status).toBe("debriefed");
-    expect(after.targetMethodologyId).toBeDefined();
-    expect(after.targetMethodologyName).toBeTruthy();
+    expect(after.targetMethodologyName).toBe("向领导提加薪");
     expect(after.brief).toBeDefined();
     expect(after.designNotes).toBeTruthy();
-    expect(after.alternatives).toHaveLength(1);
+    expect(after.targetSkeleton?.steps.length).toBeGreaterThan(0);
     expect(after.messages.some((m) => m.meta !== undefined)).toBe(true);
   });
 
-  it("复盘 DTO 包含识别信息、对话与场景设计说明", async () => {
-    const { sessionId } = await endedQuiz("alternative");
-    const dto = await generateDebrief(sessionId, { database: test.db });
-    expect(dto.recognition?.alternatives).toHaveLength(1);
-    expect(dto.recognition?.designNotes).toBeTruthy();
-    expect(dto.recognition?.target.id).not.toBe(dto.recognition?.selected.id);
-    expect(dto.session.messages.length).toBeGreaterThan(USER_LINES.length);
-  });
-
   it("阻力触发记录与转录被传给复盘任务", async () => {
-    const { sessionId } = await endedQuiz("target");
+    const sessionId = await endedDrill();
     let seen: DebriefInput | undefined;
     await generateDebrief(sessionId, {
       database: test.db,
@@ -574,7 +502,6 @@ describe("综合测验复盘", () => {
     expect(seen?.transcript).toContain("[第1轮·你]");
     expect(seen?.transcript.split("\n")[0]).toMatch(/^\[第0轮·对方\]/);
     expect(seen?.firedResistance[0]).toMatchObject({ id: "r1", turns: [1] });
-    expect(seen?.recognition?.result).toBe("correct");
   });
 });
 

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { requestJson } from "@/components/methodology/labels";
-import { DIFFICULTY_LABELS, MODE_LABELS } from "@/components/practice/labels";
+import { DIFFICULTY_LABELS } from "@/components/practice/labels";
 import { RetryButton, SwitchMethodologyButton } from "@/components/practice/practice-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,14 +25,7 @@ import { useMediaQuery } from "@/lib/use-media-query";
 import type { KeyPointVerdictValue, PrincipleVerdictValue } from "@/domain/schemas";
 import type { DebriefDto, OverrideResultDto, VerdictDto } from "@/server/dto/debrief";
 
-import {
-  OUTCOME_LABELS,
-  RECOGNITION_LABELS,
-  RECOGNITION_STYLES,
-  stars,
-  VERDICT_LABELS,
-  VERDICT_STYLES,
-} from "./labels";
+import { OUTCOME_LABELS, stars, VERDICT_LABELS, VERDICT_STYLES } from "./labels";
 
 type AnyVerdict = KeyPointVerdictValue | PrincipleVerdictValue;
 
@@ -110,7 +103,6 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
             <CardHeader>
               <div className="flex flex-wrap items-center gap-2">
                 <CardTitle className="text-lg">{dto.session.scenario.title}</CardTitle>
-                <Badge variant="secondary">{MODE_LABELS[dto.mode]}</Badge>
                 <Badge variant="outline">难度：{DIFFICULTY_LABELS[dto.difficulty]}</Badge>
                 <Badge variant="outline">{dto.hintUsed ? "查看过提示" : "未查看提示"}</Badge>
               </div>
@@ -139,46 +131,14 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
             </CardContent>
           </Card>
 
-          {/* 识别 */}
-          {dto.recognition ? (
+          {/* 场景设计说明 */}
+          {dto.session.designNotes ? (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  识别
-                  <span className={`rounded px-2 py-0.5 text-xs ${RECOGNITION_STYLES[dto.recognition.result]}`}>
-                    {RECOGNITION_LABELS[dto.recognition.result]}
-                  </span>
-                </CardTitle>
+                <CardTitle className="text-base">场景设计说明</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <p>
-                  你选择的：<b>{dto.recognition.selected.name}</b>；目标方法论：<b>{dto.recognition.target.name}</b>
-                </p>
-                {dto.recognition.alternatives.length > 0 ? (
-                  <div>
-                    备选方法论：
-                    <ul className="text-muted-foreground list-disc pl-5">
-                      {dto.recognition.alternatives.map((alt) => (
-                        <li key={alt.methodologyId}>
-                          {alt.name}：{alt.reason}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-                <p>{dto.recognition.explanation}</p>
-                <div>
-                  <div className="font-medium">场景设计说明</div>
-                  <p className="text-muted-foreground">{dto.recognition.designNotes}</p>
-                </div>
-                {dto.recognition.result === "wrong" ? (
-                  <Link
-                    className="text-primary underline"
-                    href={`/library/compare?a=${dto.recognition.target.id}&b=${dto.recognition.selected.id}`}
-                  >
-                    对比两者
-                  </Link>
-                ) : null}
+              <CardContent className="text-sm">
+                <p className="text-muted-foreground">{dto.session.designNotes}</p>
               </CardContent>
             </Card>
           ) : null}

@@ -2,12 +2,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 import { HISTORY_PAGE_SIZE } from "@/domain/constants";
-import type {
-  EndReason,
-  MessageMeta,
-  MethodologySnapshot,
-  PracticeMode,
-} from "@/domain/schemas";
+import type { EndReason, MessageMeta, MethodologySnapshot } from "@/domain/schemas";
 import { db, type AppDatabase } from "@/server/db/client";
 import {
   debriefs,
@@ -17,7 +12,6 @@ import {
   scenarios,
 } from "@/server/db/schema";
 import {
-  isRevealed,
   SendMessageInput,
   toMessageDto,
   toSessionDto,
@@ -65,7 +59,6 @@ export async function createPractice(
 ): Promise<{ sessionId: string }> {
   const database = options.database ?? db;
   const scenarioId = await generateScenario(params, options);
-  const scenario = loadScenario(database, scenarioId);
 
   const sessionId = nanoid();
   database
@@ -73,9 +66,7 @@ export async function createPractice(
     .values({
       id: sessionId,
       scenarioId,
-      mode: params.mode,
       status: "briefing",
-      selectedMethodologyId: params.mode === "drill" ? scenario.targetMethodologyId : null,
       hintUsed: false,
       maxTurns: getPracticeSettings(database).maxTurns,
       createdAt: Date.now(),
@@ -96,63 +87,17 @@ export function getSession(id: string, database: AppDatabase = db): SessionDto {
     .orderBy(asc(messages.seq))
     .all();
 
-  const namedIds = [
-    ...new Set([
-      scenario.targetMethodologyId,
-      ...scenario.alternatives.map((alt) => alt.methodologyId),
-      ...(session.mode === "quiz" ? scenario.candidateIds : []),
-    ]),
-  ];
-  const methodologyRows = database
-    .select({ id: methodologies.id, name: methodologies.name })
-    .from(methodologies)
-    .where(inArray(methodologies.id, namedIds))
-    .all();
-  const names = new Map(methodologyRows.map((row) => [row.id, row.name]));
-  const tagMap = tagNamesByMethodology(database, scenario.candidateIds);
+  const targetName =
+    database
+      .select({ name: methodologies.name })
+      .from(methodologies)
+      .where(eq(methodologies.id, scenario.targetMethodologyId))
+      .get()?.name ?? "";
 
-  return toSessionDto({
-    session,
-    scenario,
-    messages: messageRows,
-    candidates:
-      session.mode === "quiz"
-        ? scenario.candidateIds.map((cid) => ({
-            id: cid,
-            name: names.get(cid) ?? "",
-            tags: tagMap.get(cid) ?? [],
-          }))
-        : [],
-    names,
-  });
+  return toSessionDto({ session, scenario, messages: messageRows, targetName });
 }
 
-// ───────────── 选择 / 开始 / 提示 ─────────────
-
-/** 综合测验：在 briefing 阶段选择（可多次修改）所用方法论，必须在候选列表中。 */
-export function selectMethodology(
-  id: string,
-  methodologyId: string,
-  database: AppDatabase = db,
-): SessionDto {
-  const session = loadSession(database, id);
-  if (session.mode !== "quiz") {
-    throw new ApiError(409, "invalid_state", "只有综合测验需要选择方法论");
-  }
-  if (session.status !== "briefing") {
-    throw new ApiError(409, "invalid_state", "练习已经开始，不能再修改所选方法论");
-  }
-  const scenario = loadScenario(database, session.scenarioId);
-  if (!scenario.candidateIds.includes(methodologyId)) {
-    throw new ApiError(400, "invalid_input", "所选方法论不在候选列表中");
-  }
-  database
-    .update(practiceSessions)
-    .set({ selectedMethodologyId: methodologyId })
-    .where(eq(practiceSessions.id, id))
-    .run();
-  return getSession(id, database);
-}
+// ───────────── 开始 / 提示 ─────────────
 
 function snapshotOf(database: AppDatabase, row: MethodologyRow): MethodologySnapshot {
   return {
@@ -178,20 +123,13 @@ export function startSession(id: string, database: AppDatabase = db): SessionDto
   if (session.status !== "briefing") {
     throw new ApiError(409, "invalid_state", "练习已经开始");
   }
-  if (!session.selectedMethodologyId) {
-    throw new ApiError(409, "invalid_state", "请先选择你要使用的方法论");
-  }
   const scenario = loadScenario(database, session.scenarioId);
   const targetSnapshot = snapshotOf(database, loadConfirmedRow(database, scenario.targetMethodologyId));
-  const selectedSnapshot =
-    session.selectedMethodologyId === scenario.targetMethodologyId
-      ? targetSnapshot
-      : snapshotOf(database, loadConfirmedRow(database, session.selectedMethodologyId));
 
   const now = Date.now();
   database.transaction((tx) => {
     tx.update(practiceSessions)
-      .set({ status: "active", targetSnapshot, selectedSnapshot, startedAt: now })
+      .set({ status: "active", targetSnapshot, startedAt: now })
       .where(and(eq(practiceSessions.id, id), eq(practiceSessions.status, "briefing")))
       .run();
     if (scenario.openingSpeaker === "counterpart" && scenario.openingLine) {
@@ -212,12 +150,9 @@ export function startSession(id: string, database: AppDatabase = db): SessionDto
   return getSession(id, database);
 }
 
-/** 专项练习：查看方法论骨架，并记录 hintUsed。综合测验不提供提示。 */
+/** 查看方法论骨架，并记录 hintUsed。 */
 export function requestHint(id: string, database: AppDatabase = db): MethodologySkeletonDto {
   const session = loadSession(database, id);
-  if (session.mode !== "drill") {
-    throw new ApiError(409, "invalid_state", "综合测验不提供方法论提示");
-  }
   if (session.status !== "briefing" && session.status !== "active") {
     throw new ApiError(409, "invalid_state", "练习已结束，不能再查看提示");
   }
@@ -449,16 +384,13 @@ export function listSessions(
     .select({
       id: practiceSessions.id,
       scenarioId: practiceSessions.scenarioId,
-      mode: practiceSessions.mode,
       status: practiceSessions.status,
-      selectedMethodologyId: practiceSessions.selectedMethodologyId,
       createdAt: practiceSessions.createdAt,
       endedAt: practiceSessions.endedAt,
       scenarioTitle: scenarios.title,
       targetMethodologyId: scenarios.targetMethodologyId,
       difficulty: scenarios.difficulty,
       executionScore: debriefs.executionScore,
-      recognition: debriefs.recognition,
       outcome: debriefs.outcome,
     })
     .from(practiceSessions)
@@ -467,23 +399,14 @@ export function listSessions(
     .orderBy(desc(practiceSessions.createdAt), desc(practiceSessions.id))
     .all();
 
-  const ids = [
-    ...new Set(
-      rows
-        .flatMap((row) => [row.targetMethodologyId, row.selectedMethodologyId])
-        .filter((id): id is string => id !== null),
-    ),
-  ];
+  const ids = [...new Set(rows.map((row) => row.targetMethodologyId))];
   const names = new Map(
-    (
-      ids.length === 0
-        ? []
-        : database
-            .select({ id: methodologies.id, name: methodologies.name })
-            .from(methodologies)
-            .where(inArray(methodologies.id, ids))
-            .all()
-    ).map((row) => [row.id, row.name]),
+    database
+      .select({ id: methodologies.id, name: methodologies.name })
+      .from(methodologies)
+      .where(inArray(methodologies.id, ids))
+      .all()
+      .map((row) => [row.id, row.name]),
   );
 
   const start = (page - 1) * pageSize;
@@ -492,20 +415,12 @@ export function listSessions(
       id: row.id,
       scenarioId: row.scenarioId,
       scenarioTitle: row.scenarioTitle,
-      mode: row.mode,
       difficulty: row.difficulty,
       status: row.status,
       createdAt: row.createdAt,
       endedAt: row.endedAt,
-      // 综合测验在复盘前不显示所用方法论，避免与目标方法论混在一起
-      methodologyName:
-        row.mode === "drill"
-          ? (names.get(row.targetMethodologyId) ?? "")
-          : isRevealed(row.status) && row.selectedMethodologyId
-            ? (names.get(row.selectedMethodologyId) ?? null)
-            : null,
+      methodologyName: names.get(row.targetMethodologyId) ?? "",
       executionScore: row.executionScore ?? null,
-      recognition: row.recognition ?? null,
       outcome: row.outcome ?? null,
     })),
     page,
@@ -514,23 +429,10 @@ export function listSessions(
   };
 }
 
-/** 重练：以同一场景新建一场 briefing 练习，模式默认沿用该场景上一次练习的模式。 */
-export function retryScenario(
-  scenarioId: string,
-  mode?: PracticeMode,
-  database: AppDatabase = db,
-): { sessionId: string } {
+/** 重练：以同一场景新建一场 briefing 练习。 */
+export function retryScenario(scenarioId: string, database: AppDatabase = db): { sessionId: string } {
   const scenario = database.select().from(scenarios).where(eq(scenarios.id, scenarioId)).get();
   if (!scenario) throw new ApiError(404, "not_found", "场景不存在");
-
-  const previous = database
-    .select({ mode: practiceSessions.mode })
-    .from(practiceSessions)
-    .where(eq(practiceSessions.scenarioId, scenarioId))
-    .orderBy(desc(practiceSessions.createdAt), desc(practiceSessions.id))
-    .limit(1)
-    .get();
-  const nextMode: PracticeMode = mode ?? previous?.mode ?? "drill";
 
   const sessionId = nanoid();
   database
@@ -538,9 +440,7 @@ export function retryScenario(
     .values({
       id: sessionId,
       scenarioId,
-      mode: nextMode,
       status: "briefing",
-      selectedMethodologyId: nextMode === "drill" ? scenario.targetMethodologyId : null,
       hintUsed: false,
       maxTurns: getPracticeSettings(database).maxTurns,
       createdAt: Date.now(),

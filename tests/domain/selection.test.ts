@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SELECTION_EPSILON } from "@/domain/constants";
-import { pickWeighted, resolveScope } from "@/domain/selection";
+import { pickRandom, resolveScope } from "@/domain/selection";
 
 const library = [
   { id: "a", sourceId: "s1", tagIds: ["work"] },
@@ -14,61 +13,54 @@ const ids = (items: { id: string }[]) => items.map((item) => item.id);
 
 describe("resolveScope", () => {
   it("全空 = 整个方法论库", () => {
-    expect(ids(resolveScope({ tagIds: [], sourceIds: [], methodologyIds: [] }, library))).toEqual([
-      "a",
-      "b",
-      "c",
-      "d",
-    ]);
+    expect(ids(resolveScope({ tagIds: [], sourceIds: [] }, library))).toEqual(["a", "b", "c", "d"]);
   });
 
-  it("按标签、资料、方法论取并集，保持库中顺序", () => {
-    const scope = { tagIds: ["love"], sourceIds: ["s1"], methodologyIds: ["d"] };
-    expect(ids(resolveScope(scope, library))).toEqual(["a", "b", "c", "d"]);
-    expect(ids(resolveScope({ tagIds: ["work"], sourceIds: [], methodologyIds: [] }, library))).toEqual([
-      "a",
-      "c",
-    ]);
-    expect(ids(resolveScope({ tagIds: [], sourceIds: ["s2"], methodologyIds: ["d"] }, library))).toEqual([
-      "c",
-      "d",
-    ]);
+  it("标签需要全部命中，选得越多候选越少", () => {
+    expect(ids(resolveScope({ tagIds: ["work"], sourceIds: [] }, library))).toEqual(["a", "c"]);
+    expect(ids(resolveScope({ tagIds: ["work", "love"], sourceIds: [] }, library))).toEqual(["c"]);
+  });
+
+  it("资料任选其一，与标签取交集", () => {
+    expect(ids(resolveScope({ tagIds: [], sourceIds: ["s2"] }, library))).toEqual(["c"]);
+    expect(ids(resolveScope({ tagIds: ["work"], sourceIds: ["s2"] }, library))).toEqual(["c"]);
+    expect(ids(resolveScope({ tagIds: ["love"], sourceIds: ["s2"] }, library))).toEqual(["c"]);
+    expect(ids(resolveScope({ tagIds: ["love"], sourceIds: ["s1", "s2"] }, library))).toEqual(["b", "c"]);
   });
 
   it("范围没有命中任何方法论时为空", () => {
-    expect(resolveScope({ tagIds: ["none"], sourceIds: [], methodologyIds: [] }, library)).toEqual([]);
+    expect(resolveScope({ tagIds: ["none"], sourceIds: [] }, library)).toEqual([]);
+    expect(ids(resolveScope({ tagIds: ["work"], sourceIds: ["s1"] }, library))).toEqual(["a"]);
   });
 });
 
-describe("pickWeighted", () => {
-  const items = [
-    { id: "low", mastery: 0 },
-    { id: "high", mastery: 1 },
-  ];
-  // 权重：low = 1 + ε，high = ε
-  const total = 1 + 2 * SELECTION_EPSILON;
+describe("pickRandom", () => {
+  const items = ["a", "b", "c"];
 
-  it("固定 rng 下按权重区间抽取", () => {
-    expect(pickWeighted(items, () => 0)).toBe("low");
-    expect(pickWeighted(items, () => (1 + SELECTION_EPSILON) / total - 1e-9)).toBe("low");
-    expect(pickWeighted(items, () => (1 + SELECTION_EPSILON) / total + 1e-9)).toBe("high");
-    expect(pickWeighted(items, () => 0.999999)).toBe("high");
+  it("按 rng 落在区间的均匀抽取", () => {
+    expect(pickRandom(items, () => 0)).toBe("a");
+    expect(pickRandom(items, () => 0.34)).toBe("b");
+    expect(pickRandom(items, () => 0.99)).toBe("c");
+    // rng 理论上是 [0, 1)，仍防御性收紧到最后一个
+    expect(pickRandom(items, () => 1)).toBe("c");
   });
 
-  it("掌握度高的也有机会被抽到，且统计上偏向掌握度低的", () => {
+  it("均匀分布：每个候选被抽到的次数接近", () => {
     let seed = 42;
     const rng = () => {
       seed = (seed * 1664525 + 1013904223) % 4294967296;
       return seed / 4294967296;
     };
-    const counts = { low: 0, high: 0 };
-    for (let i = 0; i < 2000; i++) counts[pickWeighted(items, rng) as "low" | "high"]++;
-    expect(counts.high).toBeGreaterThan(0);
-    expect(counts.low).toBeGreaterThan(counts.high * 4);
+    const counts = new Map(items.map((id) => [id, 0]));
+    for (let i = 0; i < 3000; i++) {
+      const id = pickRandom(items, rng);
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+    for (const count of counts.values()) expect(count).toBeGreaterThan(850);
   });
 
   it("只有一个候选时必然选它；没有候选时报错", () => {
-    expect(pickWeighted([{ id: "x", mastery: 0.9 }], () => 0.5)).toBe("x");
-    expect(() => pickWeighted([], () => 0.5)).toThrow();
+    expect(pickRandom(["x"], () => 0.5)).toBe("x");
+    expect(() => pickRandom([], () => 0.5)).toThrow();
   });
 });

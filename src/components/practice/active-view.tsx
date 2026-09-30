@@ -154,11 +154,9 @@ export function ActiveView({ session }: { session: SessionDto }) {
           <Button variant="outline" size="sm" onClick={() => setShowScenario((v) => !v)}>
             {showScenario ? "收起场景" : "展开场景"}
           </Button>
-          {session.mode === "drill" ? (
-            <Button variant="outline" size="sm" onClick={() => void openHint()} disabled={busy === "hint"}>
-              查看方法论骨架
-            </Button>
-          ) : null}
+          <Button variant="outline" size="sm" onClick={() => void openHint()} disabled={busy === "hint"}>
+            查看方法论骨架
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setConfirmEnd(true)} disabled={busy !== null}>
             结束练习
           </Button>

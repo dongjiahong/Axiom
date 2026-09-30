@@ -2,7 +2,6 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 import { checkEvidence, downgradeKeyPoint, downgradePrinciple } from "@/domain/evidence";
-import { computeRecognition } from "@/domain/recognition";
 import type {
   Evidence,
   KeyPointVerdictValue,
@@ -20,7 +19,6 @@ import { db, type AppDatabase } from "@/server/db/client";
 import {
   debriefs,
   messages,
-  methodologies,
   practiceSessions,
   scenarios,
   verdicts,
@@ -47,7 +45,7 @@ import {
 
 import { getSession } from "./practice";
 
-/** 复盘：组装输入 → AI 判定 → 证据核对与降级 → 识别与执行分（代码）→ 落库；改判后重算。 */
+/** 复盘：组装输入 → AI 判定 → 证据核对与降级 → 执行分（代码）→ 落库；改判后重算。 */
 
 type SessionRow = typeof practiceSessions.$inferSelect;
 type ScenarioRow = typeof scenarios.$inferSelect;
@@ -70,24 +68,21 @@ function loadSession(database: AppDatabase, id: string): SessionRow {
   return row;
 }
 
-function requireSnapshots(session: SessionRow): { selected: MethodologySnapshot; target: MethodologySnapshot } {
-  if (!session.selectedSnapshot || !session.targetSnapshot) {
+/** 练习所用（即目标）方法论的快照。 */
+function requireSnapshot(session: SessionRow): MethodologySnapshot {
+  if (!session.targetSnapshot) {
     throw new ApiError(409, "invalid_state", "练习尚未开始，没有可复盘的内容");
   }
-  return { selected: session.selectedSnapshot, target: session.targetSnapshot };
+  return session.targetSnapshot;
 }
 
 // ───────────── 组装输入 ─────────────
 
 function buildInput(
-  database: AppDatabase,
-  session: SessionRow,
   scenario: ScenarioRow,
   rows: MessageRow[],
-  snapshots: { selected: MethodologySnapshot; target: MethodologySnapshot },
+  target: MethodologySnapshot,
 ): DebriefInput {
-  const { selected, target } = snapshots;
-
   // 阻力触发记录：linkedStepId 指向目标方法论的步骤
   const fired = new Map<string, number[]>();
   for (const m of rows) {
@@ -110,34 +105,7 @@ function buildInput(
     ];
   });
 
-  let recognition: DebriefInput["recognition"];
-  if (session.mode === "quiz") {
-    const alternativeIds = scenario.alternatives.map((a) => a.methodologyId);
-    const names = new Map(
-      database
-        .select({ id: methodologies.id, name: methodologies.name })
-        .from(methodologies)
-        .where(inArray(methodologies.id, alternativeIds))
-        .all()
-        .map((r) => [r.id, r.name]),
-    );
-    recognition = {
-      result: computeRecognition({
-        selectedId: selected.methodologyId,
-        targetId: target.methodologyId,
-        alternativeIds,
-      }).recognition,
-      selectedName: selected.name,
-      selectedApplicability: selected.body.applicability.map((a) => a.text),
-      selectedCounterIndications: selected.body.counterIndications.map((a) => a.text),
-      targetName: target.name,
-      targetApplicability: target.body.applicability.map((a) => a.text),
-      alternativeNames: alternativeIds.flatMap((id) => names.get(id) ?? []),
-    };
-  }
-
   return {
-    mode: session.mode,
     scenario: {
       title: scenario.title,
       background: scenario.background,
@@ -152,8 +120,7 @@ function buildInput(
       brief: toDebriefScenarioBrief(scenario.brief),
       designNotes: scenario.designNotes,
     },
-    selected: buildSelectedInput(selected),
-    ...(recognition ? { recognition } : {}),
+    selected: buildSelectedInput(target),
     transcript: buildTranscript(rows),
     firedResistance,
     userTurnCount: rows.filter((m) => m.role === "user").length,
@@ -200,7 +167,7 @@ async function doGenerate(sessionId: string, options: DebriefOptions): Promise<D
   if (session.status !== "ended" && session.status !== "debrief_failed") {
     throw new ApiError(409, "invalid_state", "练习还没有结束，不能复盘");
   }
-  const snapshots = requireSnapshots(session);
+  const snapshot = requireSnapshot(session);
   const scenario = database.select().from(scenarios).where(eq(scenarios.id, session.scenarioId)).get() as ScenarioRow;
   const rows = database
     .select()
@@ -210,13 +177,13 @@ async function doGenerate(sessionId: string, options: DebriefOptions): Promise<D
     .all();
 
   try {
-    const input = buildInput(database, session, scenario, rows, snapshots);
+    const input = buildInput(scenario, rows, snapshot);
     const output = await (options.debrief ?? runDebrief)(input, {
       refType: "session",
       refId: sessionId,
       signal: options.signal,
     });
-    save(database, session, snapshots, rows, output);
+    save(database, session, snapshot, rows, output);
   } catch (err) {
     database
       .update(practiceSessions)
@@ -233,17 +200,16 @@ async function doGenerate(sessionId: string, options: DebriefOptions): Promise<D
   return getDebrief(sessionId, database);
 }
 
-/** AI 输出 → 质量分收敛 → 证据核对与降级 → 识别 → 执行分 → 同一事务写入。 */
+/** AI 输出 → 质量分收敛 → 证据核对与降级 → 执行分 → 同一事务写入。 */
 function save(
   database: AppDatabase,
   session: SessionRow,
-  snapshots: { selected: MethodologySnapshot; target: MethodologySnapshot },
+  snapshot: MethodologySnapshot,
   rows: MessageRow[],
   output: DebriefOutput,
 ): void {
-  const { selected, target } = snapshots;
-  const refs = buildDebriefRefs(selected.body);
-  const stepById = new Map(selected.body.steps.map((s) => [s.id, s]));
+  const refs = buildDebriefRefs(snapshot.body);
+  const stepById = new Map(snapshot.body.steps.map((s) => [s.id, s]));
   const userMessages = rows.filter((m) => m.role === "user").map((m) => ({ turn: m.turn, content: m.content }));
   const debriefId = nanoid();
 
@@ -311,21 +277,7 @@ function save(
     });
   }
 
-  const breakdown = effectiveScore(selected, verdictRows);
-  const recognition =
-    session.mode === "quiz"
-      ? computeRecognition({
-          selectedId: selected.methodologyId,
-          targetId: target.methodologyId,
-          alternativeIds: (
-            database
-              .select({ alternatives: scenarios.alternatives })
-              .from(scenarios)
-              .where(eq(scenarios.id, session.scenarioId))
-              .get()?.alternatives ?? []
-          ).map((a) => a.methodologyId),
-        }).recognition
-      : null;
+  const breakdown = effectiveScore(snapshot, verdictRows);
   const now = Date.now();
 
   database.transaction((tx) => {
@@ -338,8 +290,6 @@ function save(
       .values({
         id: debriefId,
         sessionId: session.id,
-        recognition,
-        recognitionExplanation: recognition ? output.recognitionExplanation : null,
         executionScore: breakdown.executionScore,
         scoreBreakdown: breakdown,
         holisticScore: output.holistic.score,
@@ -365,15 +315,12 @@ export function getDebrief(sessionId: string, database: AppDatabase = db): Debri
   if (!debrief || session.status !== "debriefed") {
     throw new ApiError(404, "not_found", "这场练习还没有复盘");
   }
-  const snapshots = requireSnapshots(session);
   const scenario = database.select().from(scenarios).where(eq(scenarios.id, session.scenarioId)).get() as ScenarioRow;
   return toDebriefDto({
     debrief,
     verdicts: database.select().from(verdicts).where(eq(verdicts.debriefId, debrief.id)).all(),
-    selected: snapshots.selected,
-    target: snapshots.target,
+    snapshot: requireSnapshot(session),
     session: getSession(sessionId, database),
-    mode: session.mode,
     difficulty: scenario.difficulty,
     hintUsed: session.hintUsed,
   });
@@ -387,7 +334,7 @@ function loadVerdictContext(database: AppDatabase, verdictId: string) {
   const debrief = database.select().from(debriefs).where(eq(debriefs.id, verdict.debriefId)).get();
   if (!debrief) throw new ApiError(404, "not_found", "复盘不存在");
   const session = loadSession(database, debrief.sessionId);
-  const snapshot = requireSnapshots(session).selected;
+  const snapshot = requireSnapshot(session);
   return { verdict, debrief, snapshot };
 }
 

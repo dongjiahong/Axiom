@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SessionDto } from "@/server/dto/session";
 
-import { DIFFICULTY_LABELS, MODE_LABELS } from "./labels";
+import { DIFFICULTY_LABELS } from "./labels";
 
 /** 场景卡：只含可见字段（标题、背景、你的角色、你的目标、对方是谁、难度）。 */
 export function ScenarioCard({ session }: { session: SessionDto }) {
@@ -12,7 +12,6 @@ export function ScenarioCard({ session }: { session: SessionDto }) {
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="text-lg">{scenario.title}</CardTitle>
-          <Badge variant="secondary">{MODE_LABELS[session.mode]}</Badge>
           <Badge variant="outline">难度：{DIFFICULTY_LABELS[session.difficulty]}</Badge>
         </div>
       </CardHeader>

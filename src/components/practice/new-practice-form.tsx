@@ -5,23 +5,17 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { QUIZ_MIN_SCOPE_SIZE } from "@/domain/constants";
-import type { Difficulty, PracticeMode } from "@/domain/schemas";
+import type { Difficulty, SelectionMode } from "@/domain/schemas";
 import { resolveScope } from "@/domain/selection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { requestJson } from "@/components/methodology/labels";
 
-import {
-  DIFFICULTY_DESCRIPTIONS,
-  DIFFICULTY_LABELS,
-  MODE_DESCRIPTIONS,
-  MODE_LABELS,
-} from "./labels";
+import { DIFFICULTY_DESCRIPTIONS, DIFFICULTY_LABELS } from "./labels";
+import { ScenarioLoadingOverlay } from "./scenario-loading-overlay";
 
 export interface ScopeMethodology {
   id: string;
@@ -31,62 +25,46 @@ export interface ScopeMethodology {
 }
 
 interface Props {
-  initialMode: PracticeMode;
   methodologies: ScopeMethodology[];
   tags: { id: string; name: string }[];
   sources: { id: string; title: string }[];
 }
 
-type DrillSelection = "pick" | "random";
-
 function toggled(list: string[], id: string, checked: boolean): string[] {
   return checked ? [...list, id] : list.filter((x) => x !== id);
 }
 
-export function NewPracticeForm({ initialMode, methodologies, tags, sources }: Props) {
+export function NewPracticeForm({ methodologies, tags, sources }: Props) {
   const router = useRouter();
-  const [mode, setMode] = useState<PracticeMode>(initialMode);
-  const [drillSelection, setDrillSelection] = useState<DrillSelection>("pick");
+  const [selection, setSelection] = useState<SelectionMode>("pick");
   const [pickId, setPickId] = useState<string | null>(null);
+  // 标签全部命中、资料任选其一；都不选表示整个方法论库。两者取交集。
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [sourceIds, setSourceIds] = useState<string[]>([]);
-  const [methodologyIds, setMethodologyIds] = useState<string[]>([]);
   const [difficulty, setDifficulty] = useState<Difficulty>("neutral");
   const [query, setQuery] = useState("");
-  // 只在「指定」模式出现，用于筛选下方列表的显示（多选取交集），不参与选题范围。
-  const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const scope = useMemo(() => ({ tagIds, sourceIds, methodologyIds }), [tagIds, sourceIds, methodologyIds]);
-  const scopeSize = useMemo(() => resolveScope(scope, methodologies).length, [scope, methodologies]);
-  const picking = mode === "drill" && drillSelection === "pick";
-  // 筛选标签只在「指定」模式出现，不参与选题范围；多个标签同时选中时取交集（逐步收窄）。
-  const visible = methodologies
-    .filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase()))
-    .filter((m) => !picking || filterTagIds.every((tagId) => m.tagIds.includes(tagId)));
+  const scope = useMemo(() => ({ tagIds, sourceIds }), [tagIds, sourceIds]);
+  const scoped = useMemo(() => resolveScope(scope, methodologies), [scope, methodologies]);
+  const picking = selection === "pick";
+  const visible = scoped.filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase()));
   const filterableTags = tags.filter((tag) => methodologies.some((m) => m.tagIds.includes(tag.id)));
 
-  const minSize = mode === "quiz" ? QUIZ_MIN_SCOPE_SIZE : 1;
   const problem = picking
     ? pickId
       ? null
       : "请先选择 1 个方法论"
-    : scopeSize < minSize
-      ? `选题范围内至少需要 ${minSize} 个已确认方法论，当前只有 ${scopeSize} 个`
+    : scoped.length === 0
+      ? "选题范围内没有已确认的方法论，请放宽标签或资料筛选"
       : null;
 
   async function submit() {
     setSubmitting(true);
     try {
       const body = picking
-        ? {
-            mode,
-            selection: "pick",
-            methodologyId: pickId,
-            scope: { tagIds: [], sourceIds: [], methodologyIds: [pickId] },
-            difficulty,
-          }
-        : { mode, selection: "random", scope, difficulty };
+        ? { selection, methodologyId: pickId, scope, difficulty }
+        : { selection, scope, difficulty };
       const { sessionId } = await requestJson<{ sessionId: string }>("/api/practice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -115,169 +93,91 @@ export function NewPracticeForm({ initialMode, methodologies, tags, sources }: P
     );
   }
 
-  const tagFilter = filterableTags.length > 0 ? (
-    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="按标签筛选">
-      <span className="text-muted-foreground mr-1 text-sm">标签</span>
-      {filterableTags.map((tag) => {
-        const active = filterTagIds.includes(tag.id);
-        return (
-          <Button
-            key={tag.id}
-            type="button"
-            size="sm"
-            variant={active ? "secondary" : "outline"}
-            aria-pressed={active}
-            onClick={() => setFilterTagIds((current) => toggled(current, tag.id, !active))}
-          >
-            {tag.name}
-          </Button>
-        );
-      })}
-      {filterTagIds.length > 0 ? (
-        <Button type="button" size="sm" variant="ghost" onClick={() => setFilterTagIds([])}>
-          清除
-        </Button>
-      ) : null}
-    </div>
-  ) : null;
-
-  const scopeEditor = (
-    <div className="space-y-4">
-      <p className="text-muted-foreground text-sm">
-        按标签、资料或逐个勾选划定范围，三者取并集；都不勾选表示整个方法论库。
-        {mode === "quiz" ? `综合测验的范围至少包含 ${QUIZ_MIN_SCOPE_SIZE} 个方法论，它同时是你开场前可选的候选列表。` : ""}
-      </p>
-      {tags.length > 0 ? (
-        <div className="space-y-2">
-          <Label>标签</Label>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {tags.map((tag) => (
-              <label key={tag.id} className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={tagIds.includes(tag.id)}
-                  onCheckedChange={(checked) => setTagIds((c) => toggled(c, tag.id, checked === true))}
-                />
-                {tag.name}
-              </label>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {sources.length > 0 ? (
-        <div className="space-y-2">
-          <Label>资料</Label>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {sources.map((source) => (
-              <label key={source.id} className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={sourceIds.includes(source.id)}
-                  onCheckedChange={(checked) =>
-                    setSourceIds((c) => toggled(c, source.id, checked === true))
-                  }
-                />
-                {source.title}
-              </label>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      <div className="space-y-2">
-        <Label>逐个勾选</Label>
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索方法论名称"
-          className="max-w-64"
-          aria-label="搜索方法论名称"
-        />
-        <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-3">
-          {visible.map((m) => (
-            <label key={m.id} className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={methodologyIds.includes(m.id)}
-                onCheckedChange={(checked) =>
-                  setMethodologyIds((c) => toggled(c, m.id, checked === true))
-                }
-              />
-              {m.name}
-            </label>
-          ))}
-          {visible.length === 0 ? <p className="text-muted-foreground text-sm">没有匹配的方法论</p> : null}
-        </div>
-      </div>
-      <p className="text-sm">
-        范围内共 <span className="font-medium">{scopeSize}</span> 个已确认方法论
-      </p>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>1. 模式</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <RadioGroup
-            value={mode}
-            onValueChange={(value) => setMode(value as PracticeMode)}
-            className="grid gap-3 sm:grid-cols-2"
-          >
-            {(["drill", "quiz"] as const).map((m) => (
-              <label
-                key={m}
-                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${
-                  mode === m ? "border-primary bg-muted/50" : ""
-                }`}
-              >
-                <RadioGroupItem value={m} className="mt-1" />
-                <span className="space-y-1">
-                  <span className="block text-sm font-medium">{MODE_LABELS[m]}</span>
-                  <span className="text-muted-foreground block text-xs">{MODE_DESCRIPTIONS[m]}</span>
-                </span>
-              </label>
-            ))}
-          </RadioGroup>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>2. 选题</CardTitle>
-          {mode === "drill" ? (
-            <CardDescription>指定一个方法论，或在范围内按掌握度随机抽取（练得少的更容易被抽到）。</CardDescription>
-          ) : null}
+          <CardTitle>1. 选题</CardTitle>
+          <CardDescription>
+            指定一个方法论，或在筛选出的方法论文库中随机抽取。标签需全部命中，资料只需属于其中之一。
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {mode === "drill" ? (
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <RadioGroup
-                value={drillSelection}
-                onValueChange={(value) => setDrillSelection(value as DrillSelection)}
-                className="flex w-auto gap-6"
-              >
-                <label className="flex items-center gap-2 text-sm">
-                  <RadioGroupItem value="pick" />
-                  指定
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <RadioGroupItem value="random" />
-                  随机
-                </label>
-              </RadioGroup>
-              {picking ? tagFilter : null}
-            </div>
-          ) : null}
+          <RadioGroup
+            value={selection}
+            onValueChange={(value) => setSelection(value as SelectionMode)}
+            className="flex w-auto gap-6"
+          >
+            <label className="flex items-center gap-2 text-sm">
+              <RadioGroupItem value="pick" />
+              指定
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <RadioGroupItem value="random" />
+              随机
+            </label>
+          </RadioGroup>
 
-          {picking ? (
-            <div className="space-y-2">
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索方法论名称"
-                className="max-w-64"
-                aria-label="搜索方法论名称"
-              />
+          <div className="space-y-3">
+            {filterableTags.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="按标签筛选">
+                <span className="text-muted-foreground mr-1 text-sm">标签</span>
+                {filterableTags.map((tag) => (
+                  <Button
+                    key={tag.id}
+                    type="button"
+                    size="sm"
+                    variant={tagIds.includes(tag.id) ? "secondary" : "outline"}
+                    aria-pressed={tagIds.includes(tag.id)}
+                    onClick={() => setTagIds((c) => toggled(c, tag.id, !c.includes(tag.id)))}
+                  >
+                    {tag.name}
+                  </Button>
+                ))}
+              </div>
+            ) : null}
+            {sources.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="按资料筛选">
+                <span className="text-muted-foreground mr-1 text-sm">资料</span>
+                {sources.map((source) => (
+                  <Button
+                    key={source.id}
+                    type="button"
+                    size="sm"
+                    variant={sourceIds.includes(source.id) ? "secondary" : "outline"}
+                    aria-pressed={sourceIds.includes(source.id)}
+                    onClick={() => setSourceIds((c) => toggled(c, source.id, !c.includes(source.id)))}
+                  >
+                    {source.title}
+                  </Button>
+                ))}
+              </div>
+            ) : null}
+            {tagIds.length > 0 || sourceIds.length > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setTagIds([]);
+                  setSourceIds([]);
+                }}
+              >
+                清除筛选
+              </Button>
+            ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="practice-methodology-query">方法论</Label>
+            <Input
+              id="practice-methodology-query"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索方法论名称"
+              className="max-w-64"
+            />
+            {picking ? (
               <RadioGroup
                 value={pickId ?? ""}
                 onValueChange={setPickId}
@@ -293,21 +193,32 @@ export function NewPracticeForm({ initialMode, methodologies, tags, sources }: P
                   <p className="text-muted-foreground text-sm">没有匹配的方法论</p>
                 ) : null}
               </RadioGroup>
-              {pickId && !visible.some((m) => m.id === pickId) ? (
-                <p className="text-muted-foreground text-sm">
-                  已选「{methodologies.find((m) => m.id === pickId)?.name}」，不在当前筛选结果中
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            scopeEditor
-          )}
+            ) : (
+              <ul className="max-h-64 space-y-2 overflow-y-auto rounded-md border p-3 text-sm">
+                {visible.map((m) => (
+                  <li key={m.id}>{m.name}</li>
+                ))}
+                {visible.length === 0 ? (
+                  <li className="text-muted-foreground">没有匹配的方法论</li>
+                ) : null}
+              </ul>
+            )}
+            {picking && pickId && !visible.some((m) => m.id === pickId) ? (
+              <p className="text-muted-foreground text-sm">
+                已选「{methodologies.find((m) => m.id === pickId)?.name}」，不在当前筛选结果中
+              </p>
+            ) : null}
+            <p className="text-sm">
+              范围内共 <span className="font-medium">{scoped.length}</span> 个已确认方法论
+              {picking ? "" : "，将从中随机抽取 1 个"}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>3. 难度</CardTitle>
+          <CardTitle>2. 难度</CardTitle>
         </CardHeader>
         <CardContent>
           <RadioGroup
@@ -339,6 +250,7 @@ export function NewPracticeForm({ initialMode, methodologies, tags, sources }: P
         </Button>
         {problem ? <p className="text-muted-foreground text-sm">{problem}</p> : null}
       </div>
+      {submitting ? <ScenarioLoadingOverlay /> : null}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { integer, primaryKey, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 
 import type {
-  Alternative,
   CounterpartBrief,
   DebriefSummary,
   Difficulty,
@@ -13,9 +12,7 @@ import type {
   MessageMeta,
   ModelRewrite,
   Outcome,
-  PracticeMode,
   PrincipleVerdictValue,
-  Recognition,
   ScoreBreakdown,
   Scope,
 } from "../../domain/schemas";
@@ -165,7 +162,6 @@ export const scenarios = sqliteTable("scenarios", {
   targetVersion: integer("targetVersion").notNull(),
   difficulty: text("difficulty").$type<Difficulty>().notNull(),
   scope: text("scope", { mode: "json" }).$type<Scope>().notNull(),
-  candidateIds: text("candidateIds", { mode: "json" }).$type<string[]>().notNull(),
   title: text("title").notNull(),
   background: text("background").notNull(),
   userRole: text("userRole").notNull(),
@@ -176,7 +172,6 @@ export const scenarios = sqliteTable("scenarios", {
   openingSpeaker: text("openingSpeaker").$type<"counterpart" | "user">().notNull(),
   openingLine: text("openingLine"),
   brief: text("brief", { mode: "json" }).$type<CounterpartBrief>().notNull(),
-  alternatives: text("alternatives", { mode: "json" }).$type<Alternative[]>().notNull(),
   designNotes: text("designNotes").notNull(),
   promptVersion: text("promptVersion").notNull(),
   createdAt: integer("createdAt").notNull(),
@@ -187,11 +182,8 @@ export const practiceSessions = sqliteTable("practice_sessions", {
   scenarioId: text("scenarioId")
     .notNull()
     .references(() => scenarios.id),
-  mode: text("mode").$type<PracticeMode>().notNull(),
   status: text("status").$type<SessionStatus>().notNull(),
-  selectedMethodologyId: text("selectedMethodologyId"),
   targetSnapshot: text("targetSnapshot", { mode: "json" }).$type<MethodologySnapshot>(),
-  selectedSnapshot: text("selectedSnapshot", { mode: "json" }).$type<MethodologySnapshot>(),
   hintUsed: integer("hintUsed", { mode: "boolean" }).default(false).notNull(),
   maxTurns: integer("maxTurns").notNull(),
   endReason: text("endReason").$type<EndReason>(),
@@ -224,8 +216,6 @@ export const debriefs = sqliteTable("debriefs", {
     .notNull()
     .unique()
     .references(() => practiceSessions.id, { onDelete: "cascade" }),
-  recognition: text("recognition").$type<Recognition>(),
-  recognitionExplanation: text("recognitionExplanation"),
   executionScore: integer("executionScore").notNull(),
   scoreBreakdown: text("scoreBreakdown", { mode: "json" }).$type<ScoreBreakdown>().notNull(),
   holisticScore: integer("holisticScore").notNull(),

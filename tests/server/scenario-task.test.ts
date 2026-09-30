@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { RESISTANCE_COUNT_RANGE } from "@/domain/constants";
-import type { Difficulty, PracticeMode } from "@/domain/schemas";
+import type { Difficulty } from "@/domain/schemas";
 import {
   buildScenarioInput,
   scenarioTask,
@@ -13,7 +13,7 @@ import {
 import { makeKeyPoint, makeMethodologyBody, makeStep } from "../fixtures/methodology";
 
 function makeInput(
-  overrides: { mode?: PracticeMode; difficulty?: Difficulty; conditionalSteps?: number } = {},
+  overrides: { difficulty?: Difficulty; conditionalSteps?: number } = {},
 ): ScenarioInput {
   const conditionalSteps = overrides.conditionalSteps ?? 1;
   const steps = [
@@ -28,13 +28,8 @@ function makeInput(
     ),
   ];
   return buildScenarioInput({
-    mode: overrides.mode ?? "quiz",
     difficulty: overrides.difficulty ?? "neutral",
     target: { name: "向领导提加薪", body: makeMethodologyBody({ steps }) },
-    others: [
-      { name: "拒绝额外工作请求", body: makeMethodologyBody() },
-      { name: "结论先行的工作汇报", body: makeMethodologyBody() },
-    ],
     recentTitles: [],
   });
 }
@@ -47,33 +42,25 @@ function variant(input: ScenarioInput, patch: (o: ScenarioOutput) => void): Scen
 }
 
 describe("buildScenarioInput", () => {
-  it("使用短引用：步骤 s1..，其余方法论 m1..", () => {
+  it("使用短引用：步骤 s1..", () => {
     const input = makeInput({ conditionalSteps: 1 });
     expect(input.target.steps.map((s) => s.ref)).toEqual(["s1", "s2", "s3"]);
     expect(input.target.steps[2]).toMatchObject({ conditional: true, trigger: "对方拒绝1" });
-    expect(input.others.map((o) => o.ref)).toEqual(["m1", "m2"]);
   });
 });
 
 describe("scenario fake()", () => {
   const difficulties: Difficulty[] = ["cooperative", "neutral", "tough"];
-  for (const mode of ["drill", "quiz"] as const) {
-    for (const difficulty of difficulties) {
-      for (const conditionalSteps of [0, 1, 2, 6]) {
-        it(`${mode} / ${difficulty} / ${conditionalSteps} 个条件步骤：通过 schema 与语义校验`, () => {
-          const input = makeInput({ mode, difficulty, conditionalSteps });
-          const output = scenarioTask.fake(input);
-          expect(scenarioTask.schema.safeParse(output).success).toBe(true);
-          expect(validateScenario(output, input)).toEqual([]);
-        });
-      }
+  for (const difficulty of difficulties) {
+    for (const conditionalSteps of [0, 1, 2, 6]) {
+      it(`${difficulty} / ${conditionalSteps} 个条件步骤：通过 schema 与语义校验`, () => {
+        const input = makeInput({ difficulty, conditionalSteps });
+        const output = scenarioTask.fake(input);
+        expect(scenarioTask.schema.safeParse(output).success).toBe(true);
+        expect(validateScenario(output, input)).toEqual([]);
+      });
     }
   }
-
-  it("综合测验的 fake 带一个备选方法论，专项练习没有", () => {
-    expect(scenarioTask.fake(makeInput({ mode: "quiz" })).alternatives).toHaveLength(1);
-    expect(scenarioTask.fake(makeInput({ mode: "drill" })).alternatives).toHaveLength(0);
-  });
 
   it("fake 标题包含 recentTitles.length + 1，用于区分", () => {
     const input = { ...makeInput(), recentTitles: ["a", "b"] };
@@ -120,14 +107,6 @@ describe("validateScenario", () => {
       });
     }
 
-    it("含其他方法论名称时报错（忽略标点与空白）", () => {
-      const errors = validateScenario(
-        variant(input, (o) => (o.background = "你正在考虑 拒绝，额外工作请求。")),
-        input,
-      );
-      expect(errors.some((e) => e.includes("拒绝额外工作请求"))).toBe(true);
-    });
-
     it("含长度 ≥4 的步骤标题时报错，过短的步骤标题不参与比对", () => {
       expect(
         validateScenario(variant(input, (o) => (o.userGoal = "先预约合适的时机再说")), input).some(
@@ -140,7 +119,7 @@ describe("validateScenario", () => {
 
     it("隐藏字段（角色卡、designNotes）可以出现方法论名称", () => {
       const output = variant(input, (o) => {
-        o.designNotes = "向领导提加薪最适合这个场景，区别于拒绝额外工作请求。";
+        o.designNotes = "向领导提加薪最适合这个场景。";
         o.brief.trueStance = "担心向领导提加薪会被拒绝";
       });
       expect(validateScenario(output, input)).toEqual([]);
@@ -205,15 +184,5 @@ describe("validateScenario", () => {
       const output = variant(target, (o) => (o.brief.plannedResistance = [resistance(null)]));
       expect(validateScenario(output, target)).toEqual([]);
     });
-  });
-
-  it("alternatives 的引用必须在 others 中；专项练习允许为空", () => {
-    expect(
-      validateScenario(
-        variant(input, (o) => (o.alternatives = [{ ref: "m9", reason: "x" }])),
-        input,
-      ).join(),
-    ).toContain("alternatives[0].ref");
-    expect(validateScenario(variant(input, (o) => (o.alternatives = [])), input)).toEqual([]);
   });
 });

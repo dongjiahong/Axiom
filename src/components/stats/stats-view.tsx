@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Fragment, useState } from "react";
 import {
   Bar,
@@ -28,17 +27,12 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Difficulty } from "@/domain/schemas";
-import type {
-  ConfusionRowDto,
-  MethodologyOverviewDto,
-  StatsDifficultyDto,
-} from "@/server/dto/stats";
+import type { MethodologyOverviewDto, StatsDifficultyDto } from "@/server/dto/stats";
 
 import {
   DIFFICULTY_ORDER,
   formatDate,
   formatMastery,
-  formatPercent,
   formatScore,
   OUTCOME_ORDER,
   OUTCOME_SHORT_LABELS,
@@ -52,7 +46,6 @@ const DIFFICULTY_COLORS: Record<Difficulty, string> = {
 
 export interface StatsViewProps {
   overview: MethodologyOverviewDto[];
-  confusion: ConfusionRowDto[];
   difficulty: StatsDifficultyDto;
   filtered: boolean;
 }
@@ -191,21 +184,13 @@ function OverviewTable({ rows, filtered }: { rows: MethodologyOverviewDto[]; fil
                 <p className="text-muted-foreground text-xs">{row.tags.join("、")}</p>
               ) : null}
               <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <Metric label="专项 / 测验" value={`${row.drillCount} / ${row.quizCount}`} />
+                <Metric label="练习场数" value={`${row.practiceCount}`} />
                 <Metric label="掌握度" value={formatMastery(row.mastery)} />
                 <Metric label="全部均值" value={formatScore(row.execAvgAll)} />
                 <Metric label="最近 5 场" value={formatScore(row.execAvgRecent)} />
                 <Metric
                   label="看过 / 未看提示"
                   value={`${formatScore(row.execAvgWithHint)} / ${formatScore(row.execAvgWithoutHint)}`}
-                />
-                <Metric
-                  label="识别正确率"
-                  value={
-                    row.recognitionAccuracy === null
-                      ? "—"
-                      : `${formatPercent(row.recognitionAccuracy)}（${row.recognitionN}）`
-                  }
                 />
                 <Metric label="最近练习" value={formatDate(row.lastPracticedAt)} />
               </dl>
@@ -225,11 +210,10 @@ function OverviewTable({ rows, filtered }: { rows: MethodologyOverviewDto[]; fil
         <TableRow>
           <TableHead>方法论</TableHead>
           <TableHead>标签</TableHead>
-          <TableHead className="text-right">专项 / 测验</TableHead>
+          <TableHead className="text-right">练习场数</TableHead>
           <TableHead className="text-right">全部均值</TableHead>
           <TableHead className="text-right">最近 5 场</TableHead>
           <TableHead className="text-right">看过 / 未看提示</TableHead>
-          <TableHead className="text-right">识别正确率</TableHead>
           <TableHead className="text-right">掌握度</TableHead>
           <TableHead className="text-right">最近练习</TableHead>
           <TableHead>趋势</TableHead>
@@ -253,18 +237,11 @@ function OverviewTable({ rows, filtered }: { rows: MethodologyOverviewDto[]; fil
                 ) : null}
               </TableCell>
               <TableCell className="text-muted-foreground">{row.tags.join("、") || "—"}</TableCell>
-              <TableCell className="text-right">
-                {row.drillCount} / {row.quizCount}
-              </TableCell>
+              <TableCell className="text-right">{row.practiceCount}</TableCell>
               <TableCell className="text-right">{formatScore(row.execAvgAll)}</TableCell>
               <TableCell className="text-right">{formatScore(row.execAvgRecent)}</TableCell>
               <TableCell className="text-right">
                 {formatScore(row.execAvgWithHint)} / {formatScore(row.execAvgWithoutHint)}
-              </TableCell>
-              <TableCell className="text-right">
-                {row.recognitionAccuracy === null
-                  ? "—"
-                  : `${formatPercent(row.recognitionAccuracy)}（${row.recognitionN}）`}
               </TableCell>
               <TableCell className="text-right">{formatMastery(row.mastery)}</TableCell>
               <TableCell className="text-right">{formatDate(row.lastPracticedAt)}</TableCell>
@@ -274,7 +251,7 @@ function OverviewTable({ rows, filtered }: { rows: MethodologyOverviewDto[]; fil
             </TableRow>
             {expanded === row.methodologyId ? (
               <TableRow>
-                <TableCell colSpan={10} className="bg-muted/30">
+                <TableCell colSpan={8} className="bg-muted/30">
                   <TrendDetail points={row.execTrend} />
                 </TableCell>
               </TableRow>
@@ -321,40 +298,6 @@ function TrendDetail({ points }: { points: TrendPoint[] }) {
         </span>
       </div>
     </div>
-  );
-}
-
-// ───────────── 识别混淆 ─────────────
-
-function ConfusionList({ rows }: { rows: ConfusionRowDto[] }) {
-  if (rows.length === 0) {
-    return (
-      <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-        完成综合测验后这里会显示你容易混淆的方法论。
-      </div>
-    );
-  }
-  return (
-    <ul className="space-y-2">
-      {rows.map((row) => (
-        <li
-          key={`${row.targetId}-${row.selectedId}`}
-          className="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm"
-        >
-          <span className="font-medium">{row.targetName}</span>
-          <span className="text-muted-foreground">→ 误选</span>
-          <span className="font-medium">{row.selectedName}</span>
-          <span className="text-muted-foreground text-xs">：错误 {row.wrongCount} 次</span>
-          <span className="text-muted-foreground text-xs">/ 部分正确 {row.partialCount} 次</span>
-          <Link
-            href={`/library/compare?a=${row.targetId}&b=${row.selectedId}`}
-            className="ml-auto underline"
-          >
-            对比
-          </Link>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -466,19 +409,15 @@ function DifficultyView({ data }: { data: StatsDifficultyDto }) {
 
 // ───────────── 页面主体 ─────────────
 
-export function StatsView({ overview, confusion, difficulty, filtered }: StatsViewProps) {
+export function StatsView({ overview, difficulty, filtered }: StatsViewProps) {
   return (
     <Tabs defaultValue="overview" className="space-y-4">
       <TabsList>
         <TabsTrigger value="overview">方法论概览</TabsTrigger>
-        <TabsTrigger value="confusion">识别混淆</TabsTrigger>
         <TabsTrigger value="difficulty">难度分层</TabsTrigger>
       </TabsList>
       <TabsContent value="overview">
         <OverviewTable rows={overview} filtered={filtered} />
-      </TabsContent>
-      <TabsContent value="confusion">
-        <ConfusionList rows={confusion} />
       </TabsContent>
       <TabsContent value="difficulty">
         <DifficultyView data={difficulty} />

@@ -42,7 +42,7 @@ function snapshot(): MethodologySnapshot {
   };
 }
 
-function input(mode: "drill" | "quiz" = "drill"): DebriefInput {
+function input(): DebriefInput {
   const messages = [
     { role: "counterpart" as const, turn: 0, content: "你找我有事吗？" },
     { role: "user" as const, turn: 1, content: "领导您好，我想和您约个时间聊聊我今年的工作成果。" },
@@ -50,7 +50,6 @@ function input(mode: "drill" | "quiz" = "drill"): DebriefInput {
     { role: "user" as const, turn: 2, content: "我理解，那需要满足什么条件才能考虑加薪呢？" },
   ];
   return {
-    mode,
     scenario: {
       title: "示例",
       background: "背景",
@@ -69,19 +68,6 @@ function input(mode: "drill" | "quiz" = "drill"): DebriefInput {
       designNotes: "说明",
     },
     selected: buildSelectedInput(snapshot()),
-    ...(mode === "quiz"
-      ? {
-          recognition: {
-            result: "correct" as const,
-            selectedName: "向领导提加薪",
-            selectedApplicability: ["适用"],
-            selectedCounterIndications: [],
-            targetName: "向领导提加薪",
-            targetApplicability: ["适用"],
-            alternativeNames: [],
-          },
-        }
-      : {}),
     transcript: buildTranscript(messages),
     firedResistance: [{ id: "r1", trigger: "提出加薪", linkedStepTitle: "对方拒绝时追问条件", turns: [1] }],
     userTurnCount: 2,
@@ -89,8 +75,8 @@ function input(mode: "drill" | "quiz" = "drill"): DebriefInput {
 }
 
 /** 一份对 input() 完全合规的输出：从 fake 起步。 */
-function valid(mode: "drill" | "quiz" = "drill") {
-  return structuredClone(debriefTask.fake(input(mode)));
+function valid() {
+  return structuredClone(debriefTask.fake(input()));
 }
 
 describe("引用与转录", () => {
@@ -112,27 +98,21 @@ describe("引用与转录", () => {
     ]);
   });
 
-  it("提示词包含全部引用、识别信息与对话", () => {
-    const messages = debriefTask.build(input("quiz"));
+  it("提示词包含全部引用与对话", () => {
+    const messages = debriefTask.build(input());
     expect(messages[0].role).toBe("system");
     expect(messages[0].content).toContain("「向领导提加薪」");
-    expect(messages[0].content).toContain("识别结果为 correct");
     const user = messages[1].content;
     for (const ref of ["k1", "k4", "p2", "c1"]) expect(user).toContain(`"ref": "${ref}"`);
     expect(user).toContain("[第2轮·你]");
-    expect(user).toContain("识别信息");
-  });
-
-  it("专项练习的提示词要求 recognitionExplanation 为 null", () => {
-    expect(debriefTask.build(input("drill"))[0].content).toContain("recognitionExplanation：输出 null。");
   });
 });
 
 describe("fake", () => {
-  it.each(["drill", "quiz"] as const)("%s：输出通过 schema 与语义校验", (mode) => {
-    const out = debriefTask.fake(input(mode));
+  it("输出通过 schema 与语义校验", () => {
+    const out = debriefTask.fake(input());
     expect(DebriefOutput.safeParse(out).success).toBe(true);
-    expect(validateDebrief(out, input(mode))).toEqual([]);
+    expect(validateDebrief(out, input())).toEqual([]);
   });
 
   it("非条件要点前一半 done、后一半 missed；条件要点 not_triggered；原则 kept", () => {
@@ -212,16 +192,6 @@ describe("validateDebrief 语义校验", () => {
     const errors = validateDebrief(out, input());
     expect(errors.some((e) => e.includes("keyPointVerdicts[2].rewrite：判为 missed"))).toBe(true);
     expect(errors.some((e) => e.includes("「c9」不是已知的概念引用"))).toBe(true);
-  });
-
-  it("quiz 必须有识别解释；drill 必须为 null", () => {
-    const quiz = valid("quiz");
-    quiz.recognitionExplanation = "  ";
-    expect(validateDebrief(quiz, input("quiz")).some((e) => e.includes("综合测验必须给出识别解释"))).toBe(true);
-
-    const drill = valid("drill");
-    drill.recognitionExplanation = "多余";
-    expect(validateDebrief(drill, input("drill")).some((e) => e.includes("专项练习必须为 null"))).toBe(true);
   });
 
   it("质量分与判定不一致不算错误（由代码收敛）", () => {

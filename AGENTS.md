@@ -22,14 +22,12 @@
 | 候选方法论 / 方法论 / 归档 | `methodologies.status`：`draft` / `confirmed` / `archived` |
 | 方法论正文（步骤、要点、原则、概念、适用条件、反例） | `MethodologyBody`（JSON 文档，每个节点有稳定 ID），见 `src/domain/schemas.ts` |
 | 方法论快照 | `MethodologySnapshot`，存在练习上，历史练习不受后续修改影响 |
-| 专项练习 / 综合测验 | `PracticeMode`：`drill` / `quiz` |
 | 难度：配合 / 一般 / 强硬 | `Difficulty`：`cooperative` / `neutral` / `tough` |
-| 选题：指定 / 随机；选题范围 | `SelectionMode`：`pick` / `random`；`Scope` |
-| 场景 / 对方角色卡 / 计划阻力 / 备选方法论 | `scenarios` / `CounterpartBrief` / `PlannedResistance` / `Alternative` |
+| 选题：指定 / 随机；选题范围 | `SelectionMode`：`pick` / `random`；`Scope`（标签取交集、资料可选其一） |
+| 场景 / 对方角色卡 / 计划阻力 | `scenarios` / `CounterpartBrief` / `PlannedResistance` |
 | 练习 | `practice_sessions`，状态 `briefing → active → ended → debriefed`（复盘失败为 `debrief_failed`） |
 | 复盘 / 要点判定与原则判定 / 改判 | `debriefs` / `verdicts`（`kind`：`key_point` / `principle`）/ override |
 | 判定值 | 要点 `done` `partial` `missed` `not_triggered`；原则 `kept` `violated` |
-| 识别 | `Recognition`：`correct` / `partial` / `wrong` |
 | 说服结果 | `Outcome`：`agreed` `partial` `refused` `unresolved` |
 | 执行分 | `ScoreBreakdown`，由 `src/domain/scoring.ts` 计算 |
 | 合并建议 / 标签 | `merge_suggestions` / `tags`、`methodology_tags` |
@@ -43,7 +41,7 @@ src/
   components/     按功能分目录：common（外壳、导航、设置、门禁表单）、sources、methodology、
                   practice、debrief、history、home、stats；ui 是 shadcn 组件
   domain/         纯函数与类型：schemas（Zod 领域模型）、constants（所有可调参数）、
-                  scoring、recognition、mastery、selection、evidence、text-match、methodology-validate
+                  scoring、mastery、selection、evidence、text-match、methodology-validate
   lib/            前端小工具（utils、use-media-query）
   server/
     db/           schema.ts（表）、client.ts（连接、迁移）、migrations/（drizzle 生成）
@@ -66,18 +64,18 @@ deploy/           nginx 与 systemd 配置
 ## 数据流
 
 1. **抽取**：上传资料 → `parsing` 解析并分块 → `jobs` 队列跑 `extract_source`：逐块 `extract_chunk` → `cluster` 聚类 → `merge` 合并，产出 `draft` 方法论与合并建议 → 用户在编辑页审阅并"确认入库"（`methodology-validate` 校验）。
-2. **出题**：`selection` 选目标方法论（随机时按掌握度加权）→ `scenario` 任务生成场景（含隐藏的对方角色卡）→ 创建练习并冻结方法论快照。
+2. **出题**：`selection` 解析候选池（标签取交集）并指定或随机选出目标方法论 → `scenario` 任务生成场景（含隐藏的对方角色卡）→ 创建练习并冻结方法论快照。
 3. **对话**：每次用户发言由 `counterpart` 任务生成对方回复；对话中不做任何点评。
-4. **复盘**：`debrief` 任务返回要点判定、原则判定、示范改写等 → 代码核对证据并降级 → 代码计算识别与执行分 → 落库；用户可改判，之后重算。
-5. **统计**：只统计 `debriefed` 的练习，分数用改判后重算的执行分；执行归属于所选方法论，识别归属于目标方法论。
+4. **复盘**：`debrief` 任务返回要点判定、原则判定、示范改写等 → 代码核对证据并降级 → 代码计算执行分 → 落库；用户可改判，之后重算。
+5. **统计**：只统计 `debriefed` 的练习，分数用改判后重算的执行分；执行归属于场景的目标方法论。
 
 ## 硬性规则
 
 - 使用中文编写界面文案与面向用户的错误信息；代码标识使用英文。
 - `src/domain/*` 只放纯函数与类型，不得依赖数据库、Next 或网络。
 - 所有 AI 调用必须通过 `runTask()`（`src/server/llm/run-task.ts`）；不得在 service 或路由中直接调用 SDK。
-- 所有返回给客户端的数据必须经过 `src/server/dto/*` 映射。综合测验在复盘前不得泄露目标方法论、备选方法论、对方角色卡、场景设计说明；隐藏字段在未揭晓时连键都不能出现（不是 `null`）。判断是否揭晓用 `isRevealed()`。
-- 评分、识别、掌握度、证据核对都由代码计算，不得改由 AI 直接给出。AI 只给判定、质量分、点评和引用的原话；引不出证据的"做到"一律不成立。
+- 所有返回给客户端的数据必须经过 `src/server/dto/*` 映射。对方角色卡、场景设计说明、消息 meta、方法论骨架在复盘前不得泄露；隐藏字段在未揭晓时连键都不能出现（不是 `null`）。判断是否揭晓用 `isRevealed()`。
+- 评分、掌握度、证据核对都由代码计算，不得改由 AI 直接给出。AI 只给判定、质量分、点评和引用的原话；引不出证据的"做到"一律不成立。
 - 可调参数只能放在 `src/domain/constants.ts`，不要在代码中写魔法数字。
 - API Key 不得写入日志、llm_calls、错误信息或任何接口响应；接口只返回掩码。
 - 修改 AI 输出 schema 时，同步修改该任务的 `schemaDescription` 与 `fake()`，并递增 `promptVersion`。

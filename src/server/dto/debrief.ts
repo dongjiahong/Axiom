@@ -9,8 +9,6 @@ import {
   type MethodologySnapshot,
   type ModelRewrite,
   type Outcome,
-  type PracticeMode,
-  type Recognition,
   type ScoreBreakdown,
 } from "@/domain/schemas";
 import type { Debrief, Verdict } from "@/server/db/schema";
@@ -18,7 +16,7 @@ import type { Debrief, Verdict } from "@/server/db/schema";
 import type { SessionDto } from "./session";
 
 /**
- * 复盘的客户端 DTO。只在会话已复盘（debriefed）后生成，因此可以包含目标方法论、
+ * 复盘的客户端 DTO。只在会话已复盘（debriefed）后生成，因此可以包含
  * 场景隐藏字段等。
  */
 
@@ -60,7 +58,6 @@ export interface VerdictDto {
 
 export interface DebriefDto {
   sessionId: string;
-  mode: PracticeMode;
   difficulty: Difficulty;
   hintUsed: boolean;
   executionScore: number;
@@ -71,15 +68,7 @@ export interface DebriefDto {
   outcome: Outcome;
   outcomeNote: string;
   summary: DebriefSummary;
-  /** 仅综合测验。 */
-  recognition: {
-    result: Recognition;
-    explanation: string;
-    selected: { id: string; name: string };
-    target: { id: string; name: string };
-    alternatives: { methodologyId: string; name: string; reason: string }[];
-    designNotes: string;
-  } | null;
+  /** 用户所用（即目标）方法论。 */
   selected: { methodologyId: string; name: string; version: number };
   steps: {
     id: string;
@@ -138,20 +127,17 @@ export function toVerdictDto(row: Verdict, text: string): VerdictDto {
 export function toDebriefDto(params: {
   debrief: Debrief;
   verdicts: Verdict[];
-  selected: MethodologySnapshot;
-  target: MethodologySnapshot;
+  snapshot: MethodologySnapshot;
   session: SessionDto;
-  mode: PracticeMode;
   difficulty: Difficulty;
   hintUsed: boolean;
 }): DebriefDto {
-  const { debrief, selected, session } = params;
+  const { debrief, snapshot: selected, session } = params;
   const byRef = new Map(params.verdicts.map((v) => [`${v.kind}:${v.refId}`, v]));
   const breakdownSteps = new Map(debrief.scoreBreakdown.steps.map((s) => [s.stepId, s]));
 
   return {
     sessionId: debrief.sessionId,
-    mode: params.mode,
     difficulty: params.difficulty,
     hintUsed: params.hintUsed,
     executionScore: debrief.executionScore,
@@ -161,17 +147,6 @@ export function toDebriefDto(params: {
     outcome: debrief.outcome,
     outcomeNote: debrief.outcomeNote,
     summary: debrief.summary,
-    recognition:
-      params.mode === "quiz" && debrief.recognition
-        ? {
-            result: debrief.recognition,
-            explanation: debrief.recognitionExplanation ?? "",
-            selected: { id: selected.methodologyId, name: selected.name },
-            target: { id: params.target.methodologyId, name: params.target.name },
-            alternatives: session.alternatives ?? [],
-            designNotes: session.designNotes ?? "",
-          }
-        : null,
     selected: { methodologyId: selected.methodologyId, name: selected.name, version: selected.version },
     steps: selected.body.steps.map((step) => {
       const info = breakdownSteps.get(step.id);

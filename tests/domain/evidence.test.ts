@@ -7,7 +7,6 @@ import {
   hasValidEvidence,
 } from "@/domain/evidence";
 import type { Evidence } from "@/domain/schemas";
-import { computeRecognition } from "@/domain/recognition";
 
 const messages = [
   { turn: 1, content: "领导您好，我想和您聊聊我今年的工作成果，可以占用您十分钟吗？" },
@@ -92,25 +91,4 @@ describe("证据降级", () => {
   });
 });
 
-describe("computeRecognition", () => {
-  it("选中目标 → correct（1）", () => {
-    expect(computeRecognition({ selectedId: "t", targetId: "t", alternativeIds: ["a"] })).toEqual({
-      recognition: "correct",
-      score: 1,
-    });
-  });
 
-  it("选中备选 → partial（0.5）", () => {
-    expect(computeRecognition({ selectedId: "a", targetId: "t", alternativeIds: ["a", "b"] })).toEqual({
-      recognition: "partial",
-      score: 0.5,
-    });
-  });
-
-  it("其他 → wrong（0）", () => {
-    expect(computeRecognition({ selectedId: "x", targetId: "t", alternativeIds: ["a"] })).toEqual({
-      recognition: "wrong",
-      score: 0,
-    });
-  });
-});

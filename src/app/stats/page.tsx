@@ -1,7 +1,7 @@
 import { StatsFilters } from "@/components/stats/stats-filters";
 import { StatsView } from "@/components/stats/stats-view";
 import { listSources } from "@/server/services/sources";
-import { getStatsConfusion, getStatsDifficulty, getStatsOverview } from "@/server/services/stats";
+import { getStatsDifficulty, getStatsOverview } from "@/server/services/stats";
 import { listTags } from "@/server/services/tags";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,6 @@ export default async function StatsPage({ searchParams }: Props) {
   const params = await searchParams;
   const filter = { tagId: first(params.tagId), sourceId: first(params.sourceId) };
   const overview = getStatsOverview(filter);
-  const confusion = getStatsConfusion(filter);
   const difficulty = getStatsDifficulty(filter);
   const tags = listTags();
   const sources = listSources();
@@ -40,7 +39,6 @@ export default async function StatsPage({ searchParams }: Props) {
 
       <StatsView
         overview={overview}
-        confusion={confusion}
         difficulty={difficulty}
         filtered={Boolean(filter.tagId || filter.sourceId)}
       />

@@ -33,20 +33,11 @@ export const ORDER_PENALTY = 10;
 /** 掌握度取最近 N 场练习。 */
 export const MASTERY_WINDOW = 5;
 
-/** 掌握度中执行分的权重。 */
-export const MASTERY_W_EXEC = 0.6;
-
-/** 掌握度中识别正确率的权重。 */
-export const MASTERY_W_RECOG = 0.4;
-
 /** 查看过提示的练习，执行分在掌握度中的折算系数。 */
 export const MASTERY_HINT_FACTOR = 0.7;
 
 /** 掌握度时间衰减的半衰期（天）。 */
 export const MASTERY_HALF_LIFE_DAYS = 30;
-
-/** 加权随机选题的基础权重，保证高掌握度也有机会被抽到。 */
-export const SELECTION_EPSILON = 0.1;
 
 /** 文本核对的最短匹配长度。 */
 export const MATCH_MIN_CHARS = 4;
@@ -108,9 +99,6 @@ export const TEXT_NUMBERED_TITLE_MAX_COUNT = 200;
 export const MD_SECTION_MIN_COUNT = 3;
 export const MD_SECTION_MAX_COUNT = 200;
 
-/** 识别结果对应的得分，掌握度与统计共用。 */
-export const RECOGNITION_SCORE = { correct: 1, partial: 0.5, wrong: 0 } as const;
-
 /** 各难度允许的计划阻力数量（含端点）。 */
 export const RESISTANCE_COUNT_RANGE = {
   cooperative: { min: 1, max: 2 },
@@ -123,9 +111,6 @@ export const SCENARIO_RECENT_TITLES = 10;
 
 /** 可见字段泄露检查：长度不小于此值的步骤标题才参与比对（过短的标题误伤率高）。 */
 export const SCENARIO_LEAK_MIN_STEP_TITLE_CHARS = 4;
-
-/** 综合测验选题范围内至少需要的已确认方法论数。 */
-export const QUIZ_MIN_SCOPE_SIZE = 2;
 
 /** 用户单条消息的字数上限。 */
 export const MESSAGE_MAX_CHARS = 1000;
@@ -159,3 +144,9 @@ export const HOME_RECENT_SESSIONS = 5;
 
 /** 历史页每页显示的练习场数。 */
 export const HISTORY_PAGE_SIZE = 20;
+
+/** 生成场景期间，全屏等待遮罩里阶段文案的轮播间隔（毫秒）；生成较慢，放慢些读得完。 */
+export const SCENARIO_LOADING_MESSAGE_INTERVAL_MS = 4800;
+
+/** 生成场景期间，全屏等待遮罩里等待秒数的刷新间隔（毫秒）。 */
+export const SCENARIO_LOADING_TICK_MS = 1000;

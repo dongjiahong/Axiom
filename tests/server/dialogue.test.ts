@@ -86,10 +86,9 @@ async function activeSession(
   const methodologyId = addMethodology();
   const { sessionId } = await createPractice(
     {
-      mode: "drill",
       selection: "pick",
       methodologyId,
-      scope: { tagIds: [], sourceIds: [], methodologyIds: [methodologyId] },
+      scope: { tagIds: [], sourceIds: [] },
       difficulty: "neutral",
     },
     { database: test.db },
@@ -277,10 +276,9 @@ describe("结束判定", () => {
     const methodologyId = addMethodology();
     const { sessionId } = await createPractice(
       {
-        mode: "drill",
         selection: "pick",
         methodologyId,
-        scope: { tagIds: [], sourceIds: [], methodologyIds: [] },
+        scope: { tagIds: [], sourceIds: [] },
         difficulty: "neutral",
       },
       opts(),
@@ -380,10 +378,9 @@ describe("endSession", () => {
     const methodologyId = addMethodology();
     const { sessionId } = await createPractice(
       {
-        mode: "drill",
         selection: "pick",
         methodologyId,
-        scope: { tagIds: [], sourceIds: [], methodologyIds: [] },
+        scope: { tagIds: [], sourceIds: [] },
         difficulty: "neutral",
       },
       opts(),

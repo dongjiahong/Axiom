@@ -429,7 +429,7 @@ export function MethodologyEditor({
           register={register}
           name="body.applicability"
           title="适用条件"
-          hint="方法论适合使用的情境特征，是场景生成与识别评判的依据。确认入库至少需要 1 条。"
+          hint="方法论适合使用的情境特征，是场景生成的依据。确认入库至少需要 1 条。"
           onOpenExcerpt={setExcerpt}
         />
         <ItemListSection
@@ -437,7 +437,7 @@ export function MethodologyEditor({
           register={register}
           name="body.counterIndications"
           title="反例"
-          hint="方法论不适合使用的情境特征，用于综合测验中构造干扰。"
+          hint="方法论不适合使用的情境特征，场景生成时不得落入这些情况。"
           onOpenExcerpt={setExcerpt}
         />
         <PrinciplesSection control={control} register={register} onOpenExcerpt={setExcerpt} />

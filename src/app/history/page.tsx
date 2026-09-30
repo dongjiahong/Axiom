@@ -25,7 +25,7 @@ export default async function HistoryPage({ searchParams }: Props) {
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold">历史</h1>
         <p className="text-muted-foreground text-sm">
-          每一场练习的时间、模式、难度、执行分与识别结果；未结束的可以继续，已复盘的可以查看复盘。
+          每一场练习的时间、难度、执行分与说服结果；未结束的可以继续，已复盘的可以查看复盘。
         </p>
       </div>
 
@@ -37,7 +37,7 @@ export default async function HistoryPage({ searchParams }: Props) {
               <Link href="/practice/new" className="text-foreground mx-1 underline">
                 新建一场练习
               </Link>
-              （专项练习或综合测验）。
+              。
             </>
           ) : (
             "这一页没有记录。"

@@ -1,13 +1,8 @@
 import { asc, eq } from "drizzle-orm";
 
-import {
-  HOME_WEAKEST_COUNT,
-  RECOGNITION_SCORE,
-  STATS_RECENT_WINDOW,
-  STATS_TREND_LIMIT,
-} from "@/domain/constants";
+import { HOME_WEAKEST_COUNT, STATS_RECENT_WINDOW, STATS_TREND_LIMIT } from "@/domain/constants";
 import { computeMastery } from "@/domain/mastery";
-import type { Difficulty, Outcome, PracticeMode, Recognition } from "@/domain/schemas";
+import type { Difficulty, Outcome } from "@/domain/schemas";
 import { db, type AppDatabase } from "@/server/db/client";
 import {
   debriefs,
@@ -19,7 +14,6 @@ import {
   type MethodologyStatus,
 } from "@/server/db/schema";
 import type {
-  ConfusionRowDto,
   DifficultyBucketDto,
   DifficultyOverallDto,
   ExecTrendPointDto,
@@ -32,7 +26,7 @@ import type {
 
 /**
  * 统计：只统计 `status='debriefed'` 的练习，分数用改判后重算的执行分。
- * 执行归属于 selectedMethodologyId，识别归属于场景的目标方法论；按方法论的 ID 聚合。
+ * 执行归属于场景的目标方法论；按方法论的 ID 聚合。
  */
 
 export interface StatsOptions {
@@ -46,20 +40,12 @@ const OUTCOMES: Outcome[] = ["agreed", "partial", "refused", "unresolved"];
 
 interface PracticeRecord {
   sessionId: string;
-  mode: PracticeMode;
   difficulty: Difficulty;
   hintUsed: boolean;
   endedAt: number;
   executionScore: number;
-  recognition: Recognition | null;
   outcome: Outcome;
-  selectedMethodologyId: string | null;
   targetMethodologyId: string;
-}
-
-interface RecognitionRecord extends PracticeRecord {
-  mode: "quiz";
-  recognition: Recognition;
 }
 
 interface MethodologyInfo {
@@ -78,14 +64,11 @@ function loadRecords(database: AppDatabase): PracticeRecord[] {
   return database
     .select({
       sessionId: practiceSessions.id,
-      mode: practiceSessions.mode,
       difficulty: scenarios.difficulty,
       hintUsed: practiceSessions.hintUsed,
       endedAt: practiceSessions.endedAt,
       executionScore: debriefs.executionScore,
-      recognition: debriefs.recognition,
       outcome: debriefs.outcome,
-      selectedMethodologyId: practiceSessions.selectedMethodologyId,
       targetMethodologyId: scenarios.targetMethodologyId,
     })
     .from(practiceSessions)
@@ -132,10 +115,6 @@ function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 function mean(values: number[]): number | null {
   if (values.length === 0) return null;
   return round1(values.reduce((sum, value) => sum + value, 0) / values.length);
@@ -147,28 +126,17 @@ function passesFilter(methodology: MethodologyInfo, filter: StatsQuery): boolean
   return true;
 }
 
-function execRecordsOf(records: PracticeRecord[], id: string): PracticeRecord[] {
-  return records.filter((record) => record.selectedMethodologyId === id);
-}
-
-function recognitionRecordsOf(records: PracticeRecord[], id: string): RecognitionRecord[] {
-  return records.filter(
-    (record): record is RecognitionRecord =>
-      record.mode === "quiz" && record.targetMethodologyId === id && record.recognition !== null,
-  );
+function recordsOf(records: PracticeRecord[], id: string): PracticeRecord[] {
+  return records.filter((record) => record.targetMethodologyId === id);
 }
 
 function lastPracticedAt(records: PracticeRecord[], id: string): number | null {
-  const times = records
-    .filter((record) => record.selectedMethodologyId === id || record.targetMethodologyId === id)
-    .map((record) => record.endedAt);
+  const times = recordsOf(records, id).map((record) => record.endedAt);
   return times.length === 0 ? null : Math.max(...times);
 }
 
 function hasHistory(records: PracticeRecord[], id: string): boolean {
-  return records.some(
-    (record) => record.selectedMethodologyId === id || record.targetMethodologyId === id,
-  );
+  return records.some((record) => record.targetMethodologyId === id);
 }
 
 /**
@@ -200,14 +168,11 @@ function toOverviewRow(
   mastery: number,
   records: PracticeRecord[],
 ): MethodologyOverviewDto {
-  const exec = execRecordsOf(records, info.id);
-  const recog = recognitionRecordsOf(records, info.id);
-  const drills = exec.filter((record) => record.mode === "drill");
-  const trend: ExecTrendPointDto[] = exec.slice(-STATS_TREND_LIMIT).map((record) => ({
+  const practices = recordsOf(records, info.id);
+  const trend: ExecTrendPointDto[] = practices.slice(-STATS_TREND_LIMIT).map((record) => ({
     endedAt: record.endedAt,
     executionScore: record.executionScore,
     difficulty: record.difficulty,
-    mode: record.mode,
     hintUsed: record.hintUsed,
   }));
 
@@ -216,25 +181,18 @@ function toOverviewRow(
     name: info.name,
     status: info.status,
     tags: info.tagNames,
-    drillCount: drills.length,
-    quizCount: exec.length - drills.length,
-    execAvgAll: mean(exec.map((record) => record.executionScore)),
-    execAvgRecent: mean(exec.slice(-STATS_RECENT_WINDOW).map((record) => record.executionScore)),
+    practiceCount: practices.length,
+    execAvgAll: mean(practices.map((record) => record.executionScore)),
+    execAvgRecent: mean(
+      practices.slice(-STATS_RECENT_WINDOW).map((record) => record.executionScore),
+    ),
     execAvgWithHint: mean(
-      drills.filter((record) => record.hintUsed).map((record) => record.executionScore),
+      practices.filter((record) => record.hintUsed).map((record) => record.executionScore),
     ),
     execAvgWithoutHint: mean(
-      drills.filter((record) => !record.hintUsed).map((record) => record.executionScore),
+      practices.filter((record) => !record.hintUsed).map((record) => record.executionScore),
     ),
     execTrend: trend,
-    recognitionAccuracy:
-      recog.length === 0
-        ? null
-        : round2(
-            recog.reduce((sum, record) => sum + RECOGNITION_SCORE[record.recognition], 0) /
-              recog.length,
-          ),
-    recognitionN: recog.length,
     mastery,
     lastPracticedAt: lastPracticedAt(records, info.id),
   };
@@ -252,51 +210,6 @@ export function getStatsOverview(
   );
 }
 
-// ───────────── 识别混淆 ─────────────
-
-export function getStatsConfusion(
-  filter: StatsQuery = {},
-  options: StatsOptions = {},
-): ConfusionRowDto[] {
-  const database = options.database ?? db;
-  const records = loadRecords(database);
-  const byId = new Map(loadMethodologies(database).map((info) => [info.id, info]));
-  const rows = new Map<string, ConfusionRowDto>();
-
-  for (const record of records) {
-    if (record.mode !== "quiz" || record.recognition === null || record.recognition === "correct") {
-      continue;
-    }
-    if (!record.selectedMethodologyId || record.selectedMethodologyId === record.targetMethodologyId) {
-      continue;
-    }
-    const target = byId.get(record.targetMethodologyId);
-    const selected = byId.get(record.selectedMethodologyId);
-    if (!target || !selected) continue;
-    if (!passesFilter(target, filter) && !passesFilter(selected, filter)) continue;
-
-    const key = `${target.id}\u0000${selected.id}`;
-    const row = rows.get(key) ?? {
-      targetId: target.id,
-      targetName: target.name,
-      selectedId: selected.id,
-      selectedName: selected.name,
-      wrongCount: 0,
-      partialCount: 0,
-    };
-    if (record.recognition === "wrong") row.wrongCount += 1;
-    else row.partialCount += 1;
-    rows.set(key, row);
-  }
-
-  return [...rows.values()].sort(
-    (a, b) =>
-      b.wrongCount + b.partialCount - (a.wrongCount + a.partialCount) ||
-      a.targetName.localeCompare(b.targetName, "zh-CN") ||
-      a.selectedName.localeCompare(b.selectedName, "zh-CN"),
-  );
-}
-
 // ───────────── 难度分层 ─────────────
 
 export function getStatsDifficulty(
@@ -309,9 +222,9 @@ export function getStatsDifficulty(
   const infos = loadMethodologies(database);
   const byId = new Map(infos.map((info) => [info.id, info]));
 
-  // 总体按执行归属（所用方法论）筛选
+  // 总体按目标方法论（即所用方法论）筛选
   const filtered = records.filter((record) => {
-    const info = record.selectedMethodologyId ? byId.get(record.selectedMethodologyId) : undefined;
+    const info = byId.get(record.targetMethodologyId);
     return info ? passesFilter(info, filter) : false;
   });
 
@@ -333,10 +246,10 @@ export function getStatsDifficulty(
     filter,
     now,
   ).map(({ info }) => {
-    const exec = execRecordsOf(records, info.id);
+    const practices = recordsOf(records, info.id);
     const byDifficulty = {} as Record<Difficulty, DifficultyBucketDto | null>;
     for (const difficulty of DIFFICULTIES) {
-      const list = exec.filter((record) => record.difficulty === difficulty);
+      const list = practices.filter((record) => record.difficulty === difficulty);
       byDifficulty[difficulty] =
         list.length === 0
           ? null
