@@ -53,11 +53,16 @@ export function NewPracticeForm({ initialMode, methodologies, tags, sources }: P
   const [methodologyIds, setMethodologyIds] = useState<string[]>([]);
   const [difficulty, setDifficulty] = useState<Difficulty>("neutral");
   const [query, setQuery] = useState("");
+  // 只筛选下方列表的显示，不参与选题范围；多个标签同时选中时取交集（逐步收窄）。
+  const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const scope = useMemo(() => ({ tagIds, sourceIds, methodologyIds }), [tagIds, sourceIds, methodologyIds]);
   const scopeSize = useMemo(() => resolveScope(scope, methodologies).length, [scope, methodologies]);
-  const visible = methodologies.filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const visible = methodologies
+    .filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase()))
+    .filter((m) => filterTagIds.every((tagId) => m.tagIds.includes(tagId)));
+  const filterableTags = tags.filter((tag) => methodologies.some((m) => m.tagIds.includes(tag.id)));
 
   const picking = mode === "drill" && drillSelection === "pick";
   const minSize = mode === "quiz" ? QUIZ_MIN_SCOPE_SIZE : 1;
@@ -108,6 +113,32 @@ export function NewPracticeForm({ initialMode, methodologies, tags, sources }: P
       </div>
     );
   }
+
+  const tagFilter = filterableTags.length > 0 ? (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="按标签筛选">
+      <span className="text-muted-foreground mr-1 text-sm">标签</span>
+      {filterableTags.map((tag) => {
+        const active = filterTagIds.includes(tag.id);
+        return (
+          <Button
+            key={tag.id}
+            type="button"
+            size="sm"
+            variant={active ? "secondary" : "outline"}
+            aria-pressed={active}
+            onClick={() => setFilterTagIds((current) => toggled(current, tag.id, !active))}
+          >
+            {tag.name}
+          </Button>
+        );
+      })}
+      {filterTagIds.length > 0 ? (
+        <Button type="button" size="sm" variant="ghost" onClick={() => setFilterTagIds([])}>
+          清除
+        </Button>
+      ) : null}
+    </div>
+  ) : null;
 
   const scopeEditor = (
     <div className="space-y-4">
@@ -217,21 +248,26 @@ export function NewPracticeForm({ initialMode, methodologies, tags, sources }: P
           ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
-          {mode === "drill" ? (
-            <RadioGroup
-              value={drillSelection}
-              onValueChange={(value) => setDrillSelection(value as DrillSelection)}
-              className="flex w-auto gap-6"
-            >
-              <label className="flex items-center gap-2 text-sm">
-                <RadioGroupItem value="pick" />
-                指定
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <RadioGroupItem value="random" />
-                随机
-              </label>
-            </RadioGroup>
+          {mode === "drill" || tagFilter ? (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              {mode === "drill" ? (
+                <RadioGroup
+                  value={drillSelection}
+                  onValueChange={(value) => setDrillSelection(value as DrillSelection)}
+                  className="flex w-auto gap-6"
+                >
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="pick" />
+                    指定
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value="random" />
+                    随机
+                  </label>
+                </RadioGroup>
+              ) : null}
+              {tagFilter}
+            </div>
           ) : null}
 
           {picking ? (
@@ -258,6 +294,11 @@ export function NewPracticeForm({ initialMode, methodologies, tags, sources }: P
                   <p className="text-muted-foreground text-sm">没有匹配的方法论</p>
                 ) : null}
               </RadioGroup>
+              {pickId && !visible.some((m) => m.id === pickId) ? (
+                <p className="text-muted-foreground text-sm">
+                  已选「{methodologies.find((m) => m.id === pickId)?.name}」，不在当前筛选结果中
+                </p>
+              ) : null}
             </div>
           ) : (
             scopeEditor
