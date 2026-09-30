@@ -8,6 +8,8 @@ import { requestJson } from "@/components/methodology/labels";
 import { Button } from "@/components/ui/button";
 import type { Difficulty } from "@/domain/schemas";
 
+import { ScenarioLoadingOverlay } from "./scenario-loading-overlay";
+
 /** 复盘页与历史页的练习入口。 */
 
 /** 再练一次：以同一场景新建一场练习，模式沿用该场景上一次的练习。 */
@@ -76,8 +78,11 @@ export function SwitchMethodologyButton({
   }
 
   return (
-    <Button variant="outline" disabled={busy} onClick={() => void start()}>
-      {busy ? "正在设计场景……" : "换个场景练同一方法论"}
-    </Button>
+    <>
+      <Button variant="outline" disabled={busy} onClick={() => void start()}>
+        {busy ? "正在设计场景……" : "换个场景练同一方法论"}
+      </Button>
+      {busy ? <ScenarioLoadingOverlay /> : null}
+    </>
   );
 }

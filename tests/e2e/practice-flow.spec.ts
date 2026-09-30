@@ -72,9 +72,12 @@ test("专项练习：导入 → 抽取 → 确认 → 练习 → 复盘改判 �
   await expect(page.getByText("第 2 / 12 轮")).toBeVisible();
   await endAndWaitForDebrief(page);
 
-  // 7. 复盘页显示执行分与场景设计说明，改判一条要点
+  // 7. 复盘页显示执行分；「查看场景」弹窗里能看到场景设计说明，随后改判一条要点
   await expect(page.getByTestId("execution-score")).toBeVisible();
+  await page.getByRole("button", { name: "查看场景", exact: true }).click();
   await expect(page.getByText("场景设计说明")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "查看场景", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "改判", exact: true }).first().click();
   await page.getByRole("button", { name: "未做到", exact: true }).click();
   await page.getByPlaceholder("改判理由（必填）").fill("E2E：这条要点确实没有做到。");

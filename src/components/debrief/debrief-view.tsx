@@ -26,6 +26,7 @@ import type { KeyPointVerdictValue, PrincipleVerdictValue } from "@/domain/schem
 import type { DebriefDto, OverrideResultDto, VerdictDto } from "@/server/dto/debrief";
 
 import { OUTCOME_LABELS, stars, VERDICT_LABELS, VERDICT_STYLES } from "./labels";
+import { MethodologySnapshotDialog, ScenarioDetailDialog } from "./session-dialogs";
 
 type AnyVerdict = KeyPointVerdictValue | PrincipleVerdictValue;
 
@@ -60,6 +61,7 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
   const [overrideTarget, setOverrideTarget] = useState<VerdictDto | null>(null);
   const [showConversation, setShowConversation] = useState(true);
   const [conversationSheetOpen, setConversationSheetOpen] = useState(false);
+  const [dialog, setDialog] = useState<"scenario" | "methodology" | null>(null);
   // 与 lg 断点一致：大屏对话在右侧栏，小屏在底部抽屉。
   const sideBySide = useMediaQuery("(min-width: 1024px)");
   const nonce = useRef(0);
@@ -92,6 +94,27 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
 
   return (
     <div className="space-y-4">
+      {/* 标题与操作固定在顶部：向下滚动时复盘入口始终可见 */}
+      <div className="bg-background sticky top-12 z-30 -mx-4 flex flex-col gap-2 border-b px-4 py-3 md:top-0 md:-mx-6 md:flex-row md:flex-wrap md:items-center md:justify-between md:px-6">
+        <h1 className="text-2xl font-semibold">复盘</h1>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setDialog("scenario")}>
+            查看场景
+          </Button>
+          <Button variant="outline" onClick={() => setDialog("methodology")}>
+            查看方法论
+          </Button>
+          <RetryButton scenarioId={dto.session.scenario.id} variant="default" />
+          <SwitchMethodologyButton methodologyId={dto.selected.methodologyId} difficulty={dto.difficulty} />
+          <Button asChild variant="outline">
+            <Link href="/practice/new">开始新的练习</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/">返回首页</Link>
+          </Button>
+        </div>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-4">
           <Button variant="outline" className="w-full lg:hidden" onClick={() => setConversationSheetOpen(true)}>
@@ -130,18 +153,6 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
               <p className="text-sm">{dto.holisticComment}</p>
             </CardContent>
           </Card>
-
-          {/* 场景设计说明 */}
-          {dto.session.designNotes ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">场景设计说明</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm">
-                <p className="text-muted-foreground">{dto.session.designNotes}</p>
-              </CardContent>
-            </Card>
-          ) : null}
 
           {/* 总结 */}
           <Card>
@@ -243,24 +254,11 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
             </section>
           ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            <RetryButton scenarioId={dto.session.scenario.id} variant="default" />
-            <SwitchMethodologyButton
-              methodologyId={dto.selected.methodologyId}
-              difficulty={dto.difficulty}
-            />
-            <Button asChild variant="outline">
-              <Link href="/practice/new">开始新的练习</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/">返回首页</Link>
-            </Button>
-          </div>
         </div>
 
         {/* 完整对话 */}
         {sideBySide ? (
-          <aside className="sticky top-4 self-start">
+          <aside className="sticky top-20 self-start">
             <div className="flex items-center justify-between pb-2">
               <h2 className="font-semibold">完整对话</h2>
               <Button size="sm" variant="ghost" onClick={() => setShowConversation((v) => !v)}>
@@ -295,6 +293,20 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
           setOverrideTarget(null);
           toast.success("已改判，执行分已更新");
         }}
+      />
+
+      <ScenarioDetailDialog
+        session={dto.session}
+        stepTitle={stepTitle}
+        open={dialog === "scenario"}
+        onOpenChange={(open) => setDialog(open ? "scenario" : null)}
+      />
+      <MethodologySnapshotDialog
+        name={dto.selected.name}
+        version={dto.selected.version}
+        skeleton={dto.session.targetSkeleton}
+        open={dialog === "methodology"}
+        onOpenChange={(open) => setDialog(open ? "methodology" : null)}
       />
     </div>
   );

@@ -28,10 +28,5 @@ export default async function DebriefPage({ params }: Props) {
     throw err;
   }
 
-  return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">复盘</h1>
-      <DebriefView initial={debrief} />
-    </div>
-  );
+  return <DebriefView initial={debrief} />;
 }

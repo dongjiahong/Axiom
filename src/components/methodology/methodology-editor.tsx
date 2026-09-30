@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
+import { StartPracticeButton } from "@/components/practice/start-practice-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -252,6 +253,7 @@ export function MethodologyEditor({
                   编辑
                 </Button>
               ) : null}
+              {data.status === "confirmed" ? <StartPracticeButton methodologyId={data.id} /> : null}
               {lifecycleButtons}
             </div>
           }

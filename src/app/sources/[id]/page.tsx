@@ -35,7 +35,9 @@ export default async function SourceDetailPage({ params }: Props) {
   const pendingChars = pending.reduce((sum, chunk) => sum + chunk.charCount, 0);
   const drafts = listSourceDrafts(id);
   const suggestions = listMergeSuggestions(id);
-  const notSkipped = detail.chunks.filter((chunk) => chunk.extractionStatus !== "skipped").length;
+  const extractedCount = detail.chunks.filter((chunk) => chunk.extractionStatus === "done").length;
+  const skipped = detail.chunks.filter((chunk) => chunk.extractionStatus === "skipped").length;
+  const chunkSummary = `${extractedCount} 个已抽取${skipped > 0 ? ` · ${skipped} 个已跳过` : ""}`;
 
   return (
     <div className="space-y-6">
@@ -49,7 +51,7 @@ export default async function SourceDetailPage({ params }: Props) {
         </div>
         <p className="text-muted-foreground text-sm">
           {detail.author ? `${detail.author} · ` : ""}
-          {formatCharCount(detail.charCount)} · {detail.chunks.length} 个章节块（{notSkipped} 个待抽取）
+          {formatCharCount(detail.charCount)} · {detail.chunks.length} 个章节块（{chunkSummary}）
           · 预估 {detail.estimatedTokens.toLocaleString("zh-CN")} token（粗略估计）
         </p>
         <ExtractionPanel

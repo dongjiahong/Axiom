@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { requestJson } from "@/components/methodology/labels";
+import { ScenarioLoadingOverlay } from "@/components/practice/scenario-loading-overlay";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,7 +26,6 @@ export function WeakestMethodologies({ items }: { items: WeakestMethodologyDto[]
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mode: "drill",
           selection: "pick",
           methodologyId: id,
           scope: { tagIds: [], sourceIds: [], methodologyIds: [id] },
@@ -82,6 +82,7 @@ export function WeakestMethodologies({ items }: { items: WeakestMethodologyDto[]
           ))}
         </div>
       )}
+      {starting !== null ? <ScenarioLoadingOverlay /> : null}
     </section>
   );
 }
