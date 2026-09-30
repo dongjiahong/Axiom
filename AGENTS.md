@@ -56,6 +56,9 @@ src/
     http.ts       ApiError、route() 包装、parseJson
   proxy.ts        门禁的拦截入口（Next 16 的 proxy，等同旧版 middleware）
   instrumentation.ts  启动时恢复中断的任务、生产环境缺口令告警
+public/           站点图标与 PWA manifest（由 app 目录的 icon.svg 等一并提供）
+assets/app-icons/ 品牌图标的全部格式（android / ios / macos / svg），只作存档：
+                  README 头图用 svg/logo.svg，界面 logo 用 svg/logo-mono-black.svg
 scripts/          seed（种子方法论）、reset-db、make-fixtures
 tests/            domain、server、e2e、fixtures、helpers
 deploy/           nginx 与 systemd 配置
@@ -90,7 +93,7 @@ deploy/           nginx 与 systemd 配置
 - **新增 AI 任务**：在 `server/prompts/` 新建文件，导出 `TaskDef`（`name`、`promptVersion`、`temperature`、`schema`、`build`、可选 `validate`、`fake`），并在 `LLMTaskName` 里登记。`fake()` 必须能通过自己的 schema 与 `validate`，否则 Fake 模式会抛错。
 - **改表结构**：改 `src/server/db/schema.ts`，运行 `pnpm db:generate` 生成迁移并提交；迁移在应用启动时自动执行。主键是 nanoid 字符串，时间是 Unix 毫秒，JSON 列存 JSON 字符串。
 - **界面**：手机和桌面都要能用（`md` 以上是侧边栏，以下是顶栏加抽屉）。表格类页面在小屏用卡片列表替代。新增页面在 375px 宽下检查一遍。样式用 Tailwind 与现有 shadcn 组件。
-- **门禁**：`AXIOM_ACCESS_PASSWORD` 非空时，`src/proxy.ts` 拦截所有页面和 `/api/*`（`/api/gate` 与 `/gate` 除外）。新增路由默认已被保护，不需要额外处理。
+- **门禁**：`AXIOM_ACCESS_PASSWORD` 非空时，`src/proxy.ts` 拦截所有页面和 `/api/*`（`/api/gate` 与 `/gate` 除外）。新增路由默认已被保护，不需要额外处理；只有站点图标与 `site.webmanifest` 在 matcher 里豁免（浏览器抓取它们时不带 cookie）。
 - **React 19 lint**：`react-hooks/set-state-in-effect` 会报错，避免在 effect 里同步 `setState`；用事件回调或派生值。
 
 ## 命令

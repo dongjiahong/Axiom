@@ -37,5 +37,8 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/|icon\\.svg$|favicon\\.ico$).*)"],
+  // 站点图标与 manifest 必须免门禁：PWA 安装时由浏览器直接抓取，跳转到 /gate 会读不到。
+  matcher: [
+    "/((?!_next/|icon\\.svg$|favicon\\.ico$|apple-icon\\.png$|icon-192\\.png$|icon-512\\.png$|icon-512-maskable\\.png$|site\\.webmanifest$).*)",
+  ],
 };

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/app-icons/svg/logo.svg" alt="Axiom" width="120" />
+</p>
+
 # Axiom
 
 把书籍中的沟通方法论抽取成骨架，再用 AI 生成情景、扮演对方进行多轮对话练习，并对“步骤做得到不到位”进行评判与统计。
