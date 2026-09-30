@@ -53,18 +53,19 @@ export function NewPracticeForm({ initialMode, methodologies, tags, sources }: P
   const [methodologyIds, setMethodologyIds] = useState<string[]>([]);
   const [difficulty, setDifficulty] = useState<Difficulty>("neutral");
   const [query, setQuery] = useState("");
-  // 只筛选下方列表的显示，不参与选题范围；多个标签同时选中时取交集（逐步收窄）。
+  // 只在「指定」模式出现，用于筛选下方列表的显示（多选取交集），不参与选题范围。
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const scope = useMemo(() => ({ tagIds, sourceIds, methodologyIds }), [tagIds, sourceIds, methodologyIds]);
   const scopeSize = useMemo(() => resolveScope(scope, methodologies).length, [scope, methodologies]);
+  const picking = mode === "drill" && drillSelection === "pick";
+  // 筛选标签只在「指定」模式出现，不参与选题范围；多个标签同时选中时取交集（逐步收窄）。
   const visible = methodologies
     .filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase()))
-    .filter((m) => filterTagIds.every((tagId) => m.tagIds.includes(tagId)));
+    .filter((m) => !picking || filterTagIds.every((tagId) => m.tagIds.includes(tagId)));
   const filterableTags = tags.filter((tag) => methodologies.some((m) => m.tagIds.includes(tag.id)));
 
-  const picking = mode === "drill" && drillSelection === "pick";
   const minSize = mode === "quiz" ? QUIZ_MIN_SCOPE_SIZE : 1;
   const problem = picking
     ? pickId
@@ -248,25 +249,23 @@ export function NewPracticeForm({ initialMode, methodologies, tags, sources }: P
           ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
-          {mode === "drill" || tagFilter ? (
+          {mode === "drill" ? (
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              {mode === "drill" ? (
-                <RadioGroup
-                  value={drillSelection}
-                  onValueChange={(value) => setDrillSelection(value as DrillSelection)}
-                  className="flex w-auto gap-6"
-                >
-                  <label className="flex items-center gap-2 text-sm">
-                    <RadioGroupItem value="pick" />
-                    指定
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <RadioGroupItem value="random" />
-                    随机
-                  </label>
-                </RadioGroup>
-              ) : null}
-              {tagFilter}
+              <RadioGroup
+                value={drillSelection}
+                onValueChange={(value) => setDrillSelection(value as DrillSelection)}
+                className="flex w-auto gap-6"
+              >
+                <label className="flex items-center gap-2 text-sm">
+                  <RadioGroupItem value="pick" />
+                  指定
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <RadioGroupItem value="random" />
+                  随机
+                </label>
+              </RadioGroup>
+              {picking ? tagFilter : null}
             </div>
           ) : null}
 
