@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PageHeader } from "@/components/common/page-header";
 import { STATUS_LABELS } from "@/components/methodology/labels";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import type { MethodologyDetailDto } from "@/server/dto/methodology";
 import { ApiError } from "@/server/http";
 import { getMethodology } from "@/server/services/methodologies";
@@ -34,25 +34,22 @@ export default async function ComparePage({ searchParams }: Props) {
   if (!a || !b) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">方法论对比</h1>
-        <p className="text-muted-foreground text-sm">
-          请在方法论库中勾选 2 个方法论后点击“对比所选”。
-        </p>
-        <Button variant="outline" asChild>
-          <Link href="/library">回到方法论库</Link>
-        </Button>
+        <PageHeader
+          back={{ href: "/library", label: "方法论库" }}
+          title="方法论对比"
+          description="请在方法论库中勾选 2 个方法论后点击“对比所选”。"
+        />
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">方法论对比</h1>
-        <p className="text-muted-foreground text-sm">
-          并排查看两个方法论的适用条件、反例、步骤与原则，用来分清它们各自适合什么情境。
-        </p>
-      </div>
+      <PageHeader
+        back={{ href: "/library", label: "方法论库" }}
+        title="方法论对比"
+        description="并排查看两个方法论的适用条件、反例、步骤与原则，用来分清它们各自适合什么情境。"
+      />
       <div className="grid gap-4 md:grid-cols-2">
         <Column methodology={a} />
         <Column methodology={b} />

@@ -21,7 +21,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="bg-sidebar hidden w-52 shrink-0 border-r md:block">
+      <aside className="bg-sidebar hidden h-screen w-52 shrink-0 overflow-y-auto border-r md:sticky md:top-0 md:block">
         <div className="flex h-14 items-center px-4">
           <Logo />
         </div>
@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className="min-w-0 flex-1 p-4 md:p-6">
-        <div className="mx-auto max-w-[1100px]">{children}</div>
+        <div className="mx-auto max-w-[1200px]">{children}</div>
       </main>
     </div>
   );

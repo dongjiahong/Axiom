@@ -1,12 +1,14 @@
 "use client";
 
+import { Ellipsis } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { requestJson } from "@/components/methodology/labels";
 import { DIFFICULTY_LABELS } from "@/components/practice/labels";
-import { RetryButton, SwitchMethodologyButton } from "@/components/practice/practice-actions";
+import { RetryButton } from "@/components/practice/practice-actions";
+import { StartPracticeDialog } from "@/components/practice/start-practice-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +20,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { QUALITY_RANGE } from "@/domain/constants";
@@ -61,7 +70,7 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
   const [overrideTarget, setOverrideTarget] = useState<VerdictDto | null>(null);
   const [showConversation, setShowConversation] = useState(true);
   const [conversationSheetOpen, setConversationSheetOpen] = useState(false);
-  const [dialog, setDialog] = useState<"scenario" | "methodology" | null>(null);
+  const [dialog, setDialog] = useState<"scenario" | "methodology" | "restart" | null>(null);
   // 与 lg 断点一致：大屏对话在右侧栏，小屏在底部抽屉。
   const sideBySide = useMediaQuery("(min-width: 1024px)");
   const nonce = useRef(0);
@@ -95,23 +104,30 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
   return (
     <div className="space-y-4">
       {/* 标题与操作固定在顶部：向下滚动时复盘入口始终可见 */}
-      <div className="bg-background sticky top-12 z-30 -mx-4 flex flex-col gap-2 border-b px-4 py-3 md:top-0 md:-mx-6 md:flex-row md:flex-wrap md:items-center md:justify-between md:px-6">
+      <div className="bg-background sticky top-12 z-30 -mx-4 flex items-center justify-between gap-2 border-b px-4 py-3 md:top-0 md:-mx-6 md:px-6">
         <h1 className="text-2xl font-semibold">复盘</h1>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setDialog("scenario")}>
-            查看场景
-          </Button>
-          <Button variant="outline" onClick={() => setDialog("methodology")}>
-            查看方法论
-          </Button>
           <RetryButton scenarioId={dto.session.scenario.id} variant="default" />
-          <SwitchMethodologyButton methodologyId={dto.selected.methodologyId} difficulty={dto.difficulty} />
-          <Button asChild variant="outline">
-            <Link href="/practice/new">开始新的练习</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/">返回首页</Link>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Ellipsis />
+                更多
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onSelect={() => setDialog("scenario")}>查看场景</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setDialog("methodology")}>查看方法论</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setDialog("restart")}>换个场景再练</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/practice/new">开始新的练习</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/history">返回历史</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -295,6 +311,12 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
         }}
       />
 
+      <StartPracticeDialog
+        methodologyId={dto.selected.methodologyId}
+        defaultDifficulty={dto.difficulty}
+        open={dialog === "restart"}
+        onOpenChange={(open) => setDialog(open ? "restart" : null)}
+      />
       <ScenarioDetailDialog
         session={dto.session}
         stepTitle={stepTitle}
@@ -421,7 +443,7 @@ function VerdictCard({
       ) : null}
 
       {verdict.evidenceDowngraded ? (
-        <p className="rounded bg-amber-50 p-2 text-xs text-amber-800">
+        <p className="rounded bg-warning/10 p-2 text-xs">
           {verdict.kind === "principle"
             ? "AI 认为违反了这条原则，但没能在你的原话中找到对应内容，已按遵守处理。"
             : "AI 认为做到了，但没能在你的原话中找到对应内容，已按未做到处理。"}

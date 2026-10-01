@@ -33,7 +33,7 @@ export function DraftList({ drafts }: { drafts: SourceDraftDto[] }) {
             <Badge variant="outline">{draft.inferredCount} 处 AI 推断</Badge>
           ) : null}
           {draft.unmatchedExcerptCount > 0 ? (
-            <Badge variant="outline" className="border-amber-500 text-amber-600">
+            <Badge variant="outline" className="border-warning text-warning">
               {draft.unmatchedExcerptCount} 处摘录未匹配
             </Badge>
           ) : null}

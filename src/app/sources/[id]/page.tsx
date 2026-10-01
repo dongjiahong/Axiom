@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/common/page-header";
 import { ChunkTable } from "@/components/sources/chunk-table";
 import { DraftList } from "@/components/sources/draft-list";
 import { MergeSuggestionList } from "@/components/sources/merge-suggestion-list";
@@ -42,6 +43,7 @@ export default async function SourceDetailPage({ params }: Props) {
   return (
     <div className="space-y-6">
       <div className="space-y-3">
+        <BackLink href="/sources" label="资料" />
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold">{detail.title}</h1>
           <Badge variant="secondary">{FORMAT_LABELS[detail.format]}</Badge>

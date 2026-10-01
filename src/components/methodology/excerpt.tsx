@@ -42,7 +42,7 @@ export function ExcerptBadge({
         variant="outline"
         className={
           excerpt.match === "none"
-            ? "border-amber-500 text-amber-600"
+            ? "border-warning text-warning"
             : excerpt.match === "exact"
               ? "border-emerald-500 text-emerald-600"
               : "border-sky-500 text-sky-600"
@@ -95,7 +95,7 @@ export function ExcerptDrawer({
         <ScrollArea className="h-[calc(100vh-8rem)] px-4">
           {excerpt && !chunk ? (
             <div className="space-y-2 text-sm">
-              <p className="text-amber-600">
+              <p className="text-warning">
                 {excerpt.match === "none"
                   ? "未能在来源章节中找到这段摘录，可能是 AI 编造或曲解，请对照原书核实。"
                   : "找不到这段摘录所在的章节（资料可能已被删除）。"}

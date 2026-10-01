@@ -1,6 +1,6 @@
 import { SaveMethodologyInput } from "@/server/dto/methodology";
 import { parseJson, route } from "@/server/http";
-import { getMethodology, saveMethodology } from "@/server/services/methodologies";
+import { deleteMethodology, getMethodology, saveMethodology } from "@/server/services/methodologies";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,4 +15,11 @@ export const GET = route(async (_req: Request, { params }: Params) => {
 export const PUT = route(async (req: Request, { params }: Params) => {
   const { id } = await params;
   return saveMethodology(id, await parseJson(req, SaveMethodologyInput));
+});
+
+/** 永久删除已归档且没出过题的方法论。 */
+export const DELETE = route(async (_req: Request, { params }: Params) => {
+  const { id } = await params;
+  deleteMethodology(id);
+  return { id };
 });

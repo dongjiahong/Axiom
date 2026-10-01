@@ -1,20 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { TagSourceSelect } from "@/components/common/tag-source-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { LIBRARY_SEARCH_DEBOUNCE_MS } from "@/domain/constants";
 import type { TagDto } from "@/server/services/tags";
-
-const ALL = "__all__";
 
 interface Props {
   status: string;
@@ -35,8 +28,19 @@ export function LibraryFilters({ status, tagId, sourceId, q, tags, sources }: Pr
     if (merged.tagId) search.set("tagId", merged.tagId);
     if (merged.sourceId) search.set("sourceId", merged.sourceId);
     if (merged.q?.trim()) search.set("q", merged.q.trim());
-    router.push(`/library?${search.toString()}`);
+    // 筛选是同一页面的状态变化，不往浏览器历史里堆记录
+    router.replace(`/library?${search.toString()}`);
   }
+
+  // 输入停顿后自动搜索；回车也会立即搜索。
+  useEffect(() => {
+    if (query.trim() === (q ?? "")) return;
+    const timer = setTimeout(() => apply({ q: query }), LIBRARY_SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  const active = Boolean(tagId || sourceId || q);
 
   return (
     <form
@@ -53,41 +57,25 @@ export function LibraryFilters({ status, tagId, sourceId, q, tags, sources }: Pr
         className="w-48"
         aria-label="搜索方法论名称"
       />
-      <Select
-        value={tagId ?? ALL}
-        onValueChange={(value) => apply({ tagId: value === ALL ? undefined : value })}
-      >
-        <SelectTrigger className="w-40" aria-label="按标签筛选">
-          <SelectValue placeholder="全部标签" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL}>全部标签</SelectItem>
-          {tags.map((tag) => (
-            <SelectItem key={tag.id} value={tag.id}>
-              {tag.name}（{tag.count}）
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        value={sourceId ?? ALL}
-        onValueChange={(value) => apply({ sourceId: value === ALL ? undefined : value })}
-      >
-        <SelectTrigger className="w-48" aria-label="按资料筛选">
-          <SelectValue placeholder="全部资料" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL}>全部资料</SelectItem>
-          {sources.map((source) => (
-            <SelectItem key={source.id} value={source.id}>
-              {source.title}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button type="submit" variant="outline">
-        搜索
-      </Button>
+      <TagSourceSelect
+        tagId={tagId}
+        sourceId={sourceId}
+        tags={tags}
+        sources={sources}
+        onChange={(next) => apply(next)}
+      />
+      {active ? (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            setQuery("");
+            router.replace(`/library?status=${status}`);
+          }}
+        >
+          清除筛选
+        </Button>
+      ) : null}
     </form>
   );
 }

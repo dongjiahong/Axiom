@@ -24,7 +24,7 @@ function endReasonText(session: SessionDto): string {
 export function EndedView({ session }: { session: SessionDto }) {
   return (
     <div className="space-y-4">
-      <ScenarioCard session={session} />
+      <ScenarioCard session={session} showTitle={false} />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">对话已结束：{endReasonText(session)}</CardTitle>

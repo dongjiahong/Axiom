@@ -31,6 +31,11 @@ export type CreatePracticeInput = z.infer<typeof CreatePracticeInput>;
 export const SessionListQuery = z.object({
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
+  /** 只列出还没复盘完成的练习（准备中、进行中、已结束、复盘失败）。 */
+  unfinished: z
+    .enum(["true"])
+    .optional()
+    .transform((value) => value === "true"),
 });
 export type SessionListQuery = z.infer<typeof SessionListQuery>;
 

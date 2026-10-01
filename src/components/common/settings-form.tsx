@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { requestJson } from "@/components/methodology/labels";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,15 +21,12 @@ interface TestResult {
   sample: string;
 }
 
-async function request<T>(url: string, method: "PUT" | "POST", body?: unknown): Promise<T> {
-  const res = await fetch(url, {
+function request<T>(url: string, method: "PUT" | "POST", body?: unknown): Promise<T> {
+  return requestJson<T>(url, {
     method,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error?.message ?? "请求失败");
-  return data as T;
 }
 
 export function SettingsForm({ initial, dataDir }: { initial: SettingsDto; dataDir: string }) {

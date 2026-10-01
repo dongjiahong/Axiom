@@ -145,6 +145,9 @@ export const HOME_RECENT_SESSIONS = 5;
 /** 历史页每页显示的练习场数。 */
 export const HISTORY_PAGE_SIZE = 20;
 
+/** 方法论库搜索框停止输入后自动搜索的等待时间（毫秒）。 */
+export const LIBRARY_SEARCH_DEBOUNCE_MS = 400;
+
 /** 生成场景期间，全屏等待遮罩里阶段文案的轮播间隔（毫秒）；生成较慢，放慢些读得完。 */
 export const SCENARIO_LOADING_MESSAGE_INTERVAL_MS = 4800;
 

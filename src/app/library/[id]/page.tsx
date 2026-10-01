@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/common/page-header";
 import { MethodologyEditor } from "@/components/methodology/methodology-editor";
 import { ApiError } from "@/server/http";
 import { getMethodology } from "@/server/services/methodologies";
@@ -23,9 +23,7 @@ export default async function MethodologyPage({ params }: Props) {
 
   return (
     <div className="space-y-4">
-      <Link href="/library" className="text-muted-foreground text-sm hover:underline">
-        ← 方法论库
-      </Link>
+      <BackLink href="/library" label="方法论库" />
       <MethodologyEditor initial={methodology} allTags={listTags().map((tag) => tag.name)} />
     </div>
   );

@@ -7,6 +7,7 @@ import {
   mergeSuggestions,
   methodologies,
   methodologyTags,
+  scenarios,
   sourceChunks,
   sources,
   tags,
@@ -21,6 +22,7 @@ import {
   changeMethodologyStatus,
   collectConfirmIssues,
   createBlankMethodology,
+  deleteMethodology,
   dismissMergeSuggestion,
   getMethodology,
   listMethodologies,
@@ -48,6 +50,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  test.db.delete(scenarios).run();
   test.db.delete(mergeSuggestions).run();
   test.db.delete(methodologies).run();
   test.db.delete(tags).run();
@@ -165,6 +168,64 @@ async function expectApiErrorAsync(promise: Promise<unknown>, status: number) {
   }
   throw new Error("预期抛出 ApiError，但没有抛出");
 }
+
+describe("删除", () => {
+  const emptyBrief = {
+    personality: "",
+    trueStance: "",
+    hiddenConcerns: [],
+    plannedResistance: [],
+    yieldConditions: "",
+    breakdownConditions: "",
+  };
+
+  it("已归档且没出过题的方法论可以删除，标签关联一并清掉", () => {
+    const id = addMethodology({ status: "archived", tagNames: ["职场"] });
+    deleteMethodology(id, test.db);
+    expect(test.db.select().from(methodologies).where(eq(methodologies.id, id)).all()).toHaveLength(0);
+    expect(test.db.select().from(methodologyTags).all()).toHaveLength(0);
+  });
+
+  it.each(["draft", "confirmed"] as const)("%s 状态不能删除，返回 409", (status) => {
+    const id = addMethodology({ status });
+    expectApiError(() => deleteMethodology(id, test.db), 409);
+    expect(statusOf(id)).toBe(status);
+  });
+
+  it("出过题的归档方法论不能删除，返回 409", () => {
+    const id = addMethodology({ status: "archived" });
+    test.db
+      .insert(scenarios)
+      .values({
+        id: nanoid(),
+        targetMethodologyId: id,
+        targetVersion: 1,
+        difficulty: "neutral",
+        scope: { tagIds: [], sourceIds: [] },
+        title: "场景",
+        background: "背景",
+        userRole: "你",
+        userGoal: "目标",
+        counterpartName: "对方",
+        counterpartRelation: "同事",
+        counterpartProfile: "简介",
+        openingSpeaker: "user",
+        openingLine: null,
+        brief: emptyBrief,
+        designNotes: "",
+        promptVersion: "scenario@2",
+        createdAt: Date.now(),
+      })
+      .run();
+    const err = expectApiError(() => deleteMethodology(id, test.db), 409);
+    expect(err.message).toContain("练习记录");
+    expect(statusOf(id)).toBe("archived");
+  });
+
+  it("方法论不存在返回 404", () => {
+    expectApiError(() => deleteMethodology("nope", test.db), 404);
+  });
+});
 
 describe("状态迁移", () => {
   it("合法迁移：draft → confirmed → draft → archived → draft", () => {

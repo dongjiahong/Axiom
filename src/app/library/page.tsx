@@ -1,9 +1,8 @@
-import Link from "next/link";
-
+import { LinkTabs } from "@/components/common/link-tabs";
+import { PageHeader } from "@/components/common/page-header";
 import { LibraryFilters } from "@/components/methodology/library-filters";
 import { LibraryList } from "@/components/methodology/library-list";
 import { STATUS_LABELS } from "@/components/methodology/labels";
-import { cn } from "@/lib/utils";
 import type { MethodologyStatus } from "@/server/db/schema";
 import { listSources } from "@/server/services/sources";
 import { listMethodologies } from "@/server/services/methodologies";
@@ -45,30 +44,20 @@ export default async function LibraryPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">方法论库</h1>
-        <p className="text-muted-foreground text-sm">
-          审阅从资料中抽取的候选方法论，确认后进入方法论库，成为出题的唯一来源。
-        </p>
-      </div>
+      <PageHeader
+        title="方法论库"
+        description="审阅从资料中抽取的候选方法论，确认后进入方法论库，成为出题的唯一来源。"
+      />
 
-      <nav className="flex gap-1 border-b" aria-label="方法论状态">
-        {TABS.map((tab) => (
-          <Link
-            key={tab}
-            href={tabHref(tab)}
-            aria-current={tab === status ? "page" : undefined}
-            className={cn(
-              "-mb-px border-b-2 px-3 py-2 text-sm",
-              tab === status
-                ? "border-primary text-foreground font-medium"
-                : "text-muted-foreground hover:text-foreground border-transparent",
-            )}
-          >
-            {STATUS_LABELS[tab]}（{counts[tab]}）
-          </Link>
-        ))}
-      </nav>
+      <LinkTabs
+        label="方法论状态"
+        items={TABS.map((tab) => ({
+          key: tab,
+          label: `${STATUS_LABELS[tab]}（${counts[tab]}）`,
+          href: tabHref(tab),
+          active: tab === status,
+        }))}
+      />
 
       <LibraryFilters
         status={status}

@@ -64,6 +64,7 @@ test("专项练习：导入 → 抽取 → 确认 → 练习 → 复盘改判 �
   await expect(page.getByText(`目标方法论：${METHODOLOGY_NAME}`)).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "查看方法论骨架" }).click();
   await expect(page.getByText("适用条件")).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "开始对话" }).click();
 
   // 6. 发两条消息后手动结束
@@ -74,10 +75,11 @@ test("专项练习：导入 → 抽取 → 确认 → 练习 → 复盘改判 �
 
   // 7. 复盘页显示执行分；「查看场景」弹窗里能看到场景设计说明，随后改判一条要点
   await expect(page.getByTestId("execution-score")).toBeVisible();
-  await page.getByRole("button", { name: "查看场景", exact: true }).click();
+  await page.getByRole("button", { name: "更多" }).click();
+  await page.getByRole("menuitem", { name: "查看场景" }).click();
   await expect(page.getByText("场景设计说明")).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "查看场景", exact: true })).toBeEnabled();
+  await expect(page.getByText("场景设计说明")).toBeHidden();
   await page.getByRole("button", { name: "改判", exact: true }).first().click();
   await page.getByRole("button", { name: "未做到", exact: true }).click();
   await page.getByPlaceholder("改判理由（必填）").fill("E2E：这条要点确实没有做到。");
@@ -90,4 +92,14 @@ test("专项练习：导入 → 抽取 → 确认 → 练习 → 复盘改判 �
   await expect(row.locator("td").nth(2)).toHaveText("1");
 });
 
+test("准备页可以放弃这场练习，放弃后回到新建练习", async ({ page }) => {
+  await open(page, "/practice/new");
+  // 前两个单选是「指定 / 随机」，之后才是方法论列表
+  await page.getByRole("radio").nth(2).click();
+  await page.getByRole("button", { name: "生成场景" }).click();
 
+  await expect(page.getByRole("button", { name: "开始对话" })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "放弃这场练习" }).click();
+  await page.getByRole("button", { name: "放弃", exact: true }).click();
+  await expect(page).toHaveURL(/\/practice\/new$/);
+});

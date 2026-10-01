@@ -1,34 +1,23 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { requestJson } from "@/components/methodology/labels";
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { MESSAGE_MAX_CHARS } from "@/domain/constants";
-import type {
-  MessageResultDto,
-  MethodologySkeletonDto,
-  SessionDto,
-  SessionMessageDto,
-} from "@/server/dto/session";
+import { cn } from "@/lib/utils";
+import type { MessageResultDto, SessionDto, SessionMessageDto } from "@/server/dto/session";
 
-import { Skeleton } from "./briefing-view";
+import { useHintSheet } from "./hint-sheet";
 import { MessageBubble } from "./message-list";
 import { ScenarioCard } from "./scenario-card";
 
-type Busy = "send" | "regenerate" | "end" | "hint" | null;
+type Busy = "send" | "regenerate" | "end" | null;
 
 const json = (body: unknown): RequestInit => ({
   method: "POST",
@@ -36,22 +25,23 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
-/** active 状态：对话区、轮数、场景卡、方法论骨架抽屉、结束确认。 */
+/** active 状态：对话区、轮数、可折叠的场景、方法论骨架抽屉、结束确认。 */
 export function ActiveView({ session }: { session: SessionDto }) {
   const router = useRouter();
   const [messages, setMessages] = useState<SessionMessageDto[]>(session.messages);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState<Busy>(null);
-  const [showScenario, setShowScenario] = useState(true);
+  // 场景在准备页已经读过，对话中默认折叠成一行摘要，把空间留给对话。
+  const [showScenario, setShowScenario] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
-  const [hintOpen, setHintOpen] = useState(false);
-  const [skeleton, setSkeleton] = useState<MethodologySkeletonDto | null>(null);
+  const hint = useHintSheet(session.id);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const url = (action: string) => `/api/sessions/${session.id}/${action}`;
   const userCount = messages.filter((m) => m.role === "user").length;
   const replyFailed = busy === null && messages.at(-1)?.role === "user";
-  const counterpartName = session.scenario.counterpart.name;
+  const { counterpart } = session.scenario;
+  const counterpartName = counterpart.name;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -127,34 +117,14 @@ export function ActiveView({ session }: { session: SessionDto }) {
     }
   }
 
-  async function openHint() {
-    setHintOpen(true);
-    if (skeleton) return;
-    setBusy("hint");
-    try {
-      setSkeleton(await requestJson<MethodologySkeletonDto>(url("hint"), { method: "POST" }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "获取失败");
-      setHintOpen(false);
-    } finally {
-      setBusy(null);
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-medium">{session.scenario.title}</h2>
-          <p className="text-muted-foreground text-sm">
-            第 {userCount} / {session.maxTurns} 轮
-          </p>
-        </div>
+        <p className="text-muted-foreground text-sm">
+          第 {userCount} / {session.maxTurns} 轮
+        </p>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowScenario((v) => !v)}>
-            {showScenario ? "收起场景" : "展开场景"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => void openHint()} disabled={busy === "hint"}>
+          <Button variant="outline" size="sm" onClick={() => void hint.show()} disabled={hint.loading}>
             查看方法论骨架
           </Button>
           <Button variant="outline" size="sm" onClick={() => setConfirmEnd(true)} disabled={busy !== null}>
@@ -163,9 +133,26 @@ export function ActiveView({ session }: { session: SessionDto }) {
         </div>
       </div>
 
-      {showScenario ? <ScenarioCard session={session} /> : null}
+      <div className="rounded-lg border">
+        <button
+          type="button"
+          className="hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm"
+          aria-expanded={showScenario}
+          onClick={() => setShowScenario((v) => !v)}
+        >
+          <ChevronRight className={cn("size-4 shrink-0 transition-transform", showScenario && "rotate-90")} />
+          <span className="shrink-0 font-medium">{showScenario ? "收起场景" : "展开场景"}</span>
+          {showScenario ? null : (
+            <span className="text-muted-foreground truncate">
+              {counterpart.name}（{counterpart.relation}）· {session.scenario.userGoal}
+            </span>
+          )}
+        </button>
+      </div>
 
-      <div className="space-y-3 rounded-lg border p-4">
+      {showScenario ? <ScenarioCard session={session} showTitle={false} /> : null}
+
+      <div className="space-y-3 rounded-lg border p-4 md:max-h-[55vh] md:overflow-y-auto">
         {messages.length === 0 ? (
           <p className="text-muted-foreground text-sm">对方在等你先开口。</p>
         ) : null}
@@ -213,38 +200,23 @@ export function ActiveView({ session }: { session: SessionDto }) {
         </div>
       </div>
 
-      <Dialog open={confirmEnd} onOpenChange={(open) => (busy === "end" ? null : setConfirmEnd(open))}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>结束练习？</DialogTitle>
-            <DialogDescription>
-              {userCount === 0
-                ? "你还没有发言，结束后本次练习会被丢弃。"
-                : "结束后不能再继续对话，随后会进入复盘。"}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmEnd(false)} disabled={busy === "end"}>
-              继续练习
-            </Button>
-            <Button onClick={() => void end()} disabled={busy === "end"}>
-              {busy === "end" ? "正在结束……" : "确认结束"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={confirmEnd}
+        onOpenChange={setConfirmEnd}
+        title="结束练习？"
+        description={
+          userCount === 0
+            ? "你还没有发言，结束后本次练习会被丢弃。"
+            : "结束后不能再继续对话，随后会进入复盘。"
+        }
+        confirmLabel="确认结束"
+        cancelLabel="继续练习"
+        busy={busy === "end"}
+        busyLabel="正在结束……"
+        onConfirm={() => void end()}
+      />
 
-      <Sheet open={hintOpen} onOpenChange={setHintOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>{skeleton?.name ?? "方法论骨架"}</SheetTitle>
-            <SheetDescription>已记录为“查看过提示”，统计中会区分。</SheetDescription>
-          </SheetHeader>
-          <div className="px-4 pb-4">
-            {skeleton ? <Skeleton skeleton={skeleton} /> : <p className="text-sm">加载中……</p>}
-          </div>
-        </SheetContent>
-      </Sheet>
+      {hint.sheet}
     </div>
   );
 }

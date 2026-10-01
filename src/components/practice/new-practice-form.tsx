@@ -1,9 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 
 import type { Difficulty, SelectionMode } from "@/domain/schemas";
 import { resolveScope } from "@/domain/selection";
@@ -12,10 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { requestJson } from "@/components/methodology/labels";
+import { EmptyState } from "@/components/common/empty-state";
 
-import { DIFFICULTY_DESCRIPTIONS, DIFFICULTY_LABELS } from "./labels";
-import { ScenarioLoadingOverlay } from "./scenario-loading-overlay";
+import { DifficultyPicker } from "./difficulty-picker";
+import { useStartPractice } from "./use-start-practice";
 
 export interface ScopeMethodology {
   id: string;
@@ -35,7 +33,6 @@ function toggled(list: string[], id: string, checked: boolean): string[] {
 }
 
 export function NewPracticeForm({ methodologies, tags, sources }: Props) {
-  const router = useRouter();
   const [selection, setSelection] = useState<SelectionMode>("pick");
   const [pickId, setPickId] = useState<string | null>(null);
   // 标签全部命中、资料任选其一；都不选表示整个方法论库。两者取交集。
@@ -43,7 +40,7 @@ export function NewPracticeForm({ methodologies, tags, sources }: Props) {
   const [sourceIds, setSourceIds] = useState<string[]>([]);
   const [difficulty, setDifficulty] = useState<Difficulty>("neutral");
   const [query, setQuery] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const { start, busy: submitting, overlay } = useStartPractice();
 
   const scope = useMemo(() => ({ tagIds, sourceIds }), [tagIds, sourceIds]);
   const scoped = useMemo(() => resolveScope(scope, methodologies), [scope, methodologies]);
@@ -59,27 +56,17 @@ export function NewPracticeForm({ methodologies, tags, sources }: Props) {
       ? "选题范围内没有已确认的方法论，请放宽标签或资料筛选"
       : null;
 
-  async function submit() {
-    setSubmitting(true);
-    try {
-      const body = picking
+  function submit() {
+    void start(
+      picking && pickId
         ? { selection, methodologyId: pickId, scope, difficulty }
-        : { selection, scope, difficulty };
-      const { sessionId } = await requestJson<{ sessionId: string }>("/api/practice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      router.push(`/practice/${sessionId}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "生成场景失败");
-      setSubmitting(false);
-    }
+        : { selection, scope, difficulty },
+    );
   }
 
   if (methodologies.length === 0) {
     return (
-      <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+      <EmptyState>
         方法论库里还没有已确认的方法论。先
         <Link href="/sources" className="text-foreground mx-1 underline">
           导入资料并抽取
@@ -89,7 +76,7 @@ export function NewPracticeForm({ methodologies, tags, sources }: Props) {
           方法论库
         </Link>
         确认入库。
-      </div>
+      </EmptyState>
     );
   }
 
@@ -99,7 +86,7 @@ export function NewPracticeForm({ methodologies, tags, sources }: Props) {
         <CardHeader>
           <CardTitle>1. 选题</CardTitle>
           <CardDescription>
-            指定一个方法论，或在筛选出的方法论文库中随机抽取。标签需全部命中，资料只需属于其中之一。
+            指定一个方法论，或在筛选出的方法论中随机抽取。标签需全部命中，资料只需属于其中之一。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -170,13 +157,15 @@ export function NewPracticeForm({ methodologies, tags, sources }: Props) {
 
           <div className="space-y-2">
             <Label htmlFor="practice-methodology-query">方法论</Label>
-            <Input
-              id="practice-methodology-query"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索方法论名称"
-              className="max-w-64"
-            />
+            {picking ? (
+              <Input
+                id="practice-methodology-query"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索方法论名称"
+                className="max-w-64"
+              />
+            ) : null}
             {picking ? (
               <RadioGroup
                 value={pickId ?? ""}
@@ -194,14 +183,17 @@ export function NewPracticeForm({ methodologies, tags, sources }: Props) {
                 ) : null}
               </RadioGroup>
             ) : (
-              <ul className="max-h-64 space-y-2 overflow-y-auto rounded-md border p-3 text-sm">
-                {visible.map((m) => (
-                  <li key={m.id}>{m.name}</li>
-                ))}
-                {visible.length === 0 ? (
-                  <li className="text-muted-foreground">没有匹配的方法论</li>
-                ) : null}
-              </ul>
+              <details className="rounded-md border text-sm">
+                <summary className="cursor-pointer px-3 py-2">查看范围内的方法论（{scoped.length}）</summary>
+                <ul className="max-h-64 space-y-2 overflow-y-auto border-t p-3">
+                  {scoped.map((m) => (
+                    <li key={m.id}>{m.name}</li>
+                  ))}
+                  {scoped.length === 0 ? (
+                    <li className="text-muted-foreground">没有匹配的方法论</li>
+                  ) : null}
+                </ul>
+              </details>
             )}
             {picking && pickId && !visible.some((m) => m.id === pickId) ? (
               <p className="text-muted-foreground text-sm">
@@ -221,36 +213,18 @@ export function NewPracticeForm({ methodologies, tags, sources }: Props) {
           <CardTitle>2. 难度</CardTitle>
         </CardHeader>
         <CardContent>
-          <RadioGroup
-            value={difficulty}
-            onValueChange={(value) => setDifficulty(value as Difficulty)}
-            className="grid gap-3 sm:grid-cols-3"
-          >
-            {(["cooperative", "neutral", "tough"] as const).map((d) => (
-              <label
-                key={d}
-                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${
-                  difficulty === d ? "border-primary bg-muted/50" : ""
-                }`}
-              >
-                <RadioGroupItem value={d} className="mt-1" />
-                <span className="space-y-1">
-                  <span className="block text-sm font-medium">{DIFFICULTY_LABELS[d]}</span>
-                  <span className="text-muted-foreground block text-xs">{DIFFICULTY_DESCRIPTIONS[d]}</span>
-                </span>
-              </label>
-            ))}
-          </RadioGroup>
+          <DifficultyPicker value={difficulty} onChange={setDifficulty} columns />
         </CardContent>
       </Card>
 
-      <div className="flex items-center gap-3">
-        <Button onClick={() => void submit()} disabled={submitting || problem !== null}>
+      {/* 小屏固定在底部：表单很长，按钮不用滚到最后 */}
+      <div className="bg-background sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t px-4 py-3 md:static md:mx-0 md:border-0 md:p-0">
+        <Button onClick={submit} disabled={submitting || problem !== null}>
           {submitting ? "正在设计场景……" : "生成场景"}
         </Button>
         {problem ? <p className="text-muted-foreground text-sm">{problem}</p> : null}
       </div>
-      {submitting ? <ScenarioLoadingOverlay /> : null}
+      {overlay}
     </div>
   );
 }

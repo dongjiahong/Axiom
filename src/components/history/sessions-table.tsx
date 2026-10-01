@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { sessionActionLabel, sessionHref } from "@/components/history/session-links";
 import { DIFFICULTY_LABELS, SESSION_STATUS_LABELS } from "@/components/practice/labels";
 import { RetryButton } from "@/components/practice/practice-actions";
 import { formatDateTime } from "@/components/sources/labels";
@@ -18,21 +19,6 @@ import {
 } from "@/components/ui/table";
 import type { SessionListItemDto } from "@/server/dto/session";
 
-/** 历史与首页「最近练习」共用的列表文案（中文，与 CONTEXT.md 术语一致）。 */
-
-/** 会话条目对应的入口：已复盘去看复盘，其余回到练习页（该页会触发/重试复盘）。 */
-function sessionHref(item: SessionListItemDto): string {
-  return item.status === "debriefed"
-    ? `/practice/${item.id}/debrief`
-    : `/practice/${item.id}`;
-}
-
-function sessionActionLabel(item: SessionListItemDto): string {
-  if (item.status === "debriefed") return "查看复盘";
-  if (item.status === "ended" || item.status === "debrief_failed") return "去复盘";
-  return "继续";
-}
-
 function StatusBadge({ item }: { item: SessionListItemDto }) {
   return (
     <Badge variant={item.status === "debrief_failed" ? "destructive" : "outline"}>
@@ -41,7 +27,7 @@ function StatusBadge({ item }: { item: SessionListItemDto }) {
   );
 }
 
-/** 再练一次：以同一场景新建一场练习。 */
+/** 历史列表：小屏卡片，桌面表格。 */
 export function SessionsTable({ items }: { items: SessionListItemDto[] }) {
   return (
     <>
@@ -146,7 +132,7 @@ export function RecentSessions({ items }: { items: SessionListItemDto[] }) {
     <ul className="divide-y rounded-lg border">
       {items.map((item) => (
         <li key={item.id} className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
-          <Link href={sessionHref(item)} className="min-w-0 flex-1 truncate font-medium hover:underline">
+          <Link href={sessionHref(item)} className="min-w-0 basis-full truncate font-medium hover:underline sm:flex-1 sm:basis-0">
             {item.scenarioTitle}
           </Link>
           <span className="text-muted-foreground">{DIFFICULTY_LABELS[item.difficulty]}</span>

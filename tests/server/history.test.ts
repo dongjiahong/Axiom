@@ -15,6 +15,7 @@ import {
 } from "@/server/db/schema";
 import { ApiError } from "@/server/http";
 import {
+  abandonSession,
   createPractice,
   getSession,
   listSessions,
@@ -230,6 +231,53 @@ describe("历史列表 listSessions", () => {
     expect(item.outcome).toBe("agreed");
     expect(item.status).toBe("debriefed");
     expect(scenarioId).toBeTruthy();
+  });
+});
+
+describe("只看未完成 listSessions({ unfinished })", () => {
+  it("排除已复盘的练习，其余状态都保留", () => {
+    const target = addMethodology("方法甲");
+    const scenarioId = insertScenario(target, "场景");
+    const base = Date.now();
+    insertSession({ scenarioId, status: "debriefed", createdAt: base });
+    const briefing = insertSession({ scenarioId, status: "briefing", createdAt: base + 1 });
+    const active = insertSession({ scenarioId, status: "active", createdAt: base + 2 });
+    const ended = insertSession({ scenarioId, status: "ended", createdAt: base + 3 });
+    const failed = insertSession({ scenarioId, status: "debrief_failed", createdAt: base + 4 });
+
+    const result = listSessions({ unfinished: true }, test.db);
+    expect(result.total).toBe(4);
+    expect(result.items.map((item) => item.id)).toEqual([failed, ended, active, briefing]);
+    expect(listSessions({}, test.db).total).toBe(5);
+  });
+});
+
+describe("放弃练习 abandonSession", () => {
+  it("briefing 状态可以放弃，场景保留以便重练", async () => {
+    const a = addMethodology("方法甲");
+    const practice = await createPractice(
+      { selection: "pick", methodologyId: a, scope: emptyScope, difficulty: "neutral" },
+      { database: test.db },
+    );
+    const scenarioId = getSession(practice.sessionId, test.db).scenario.id;
+
+    expect(abandonSession(practice.sessionId, test.db)).toEqual({ deleted: true });
+    expect(() => getSession(practice.sessionId, test.db)).toThrowError(ApiError);
+    expect(retryScenario(scenarioId, test.db).sessionId).toBeTruthy();
+  });
+
+  it("已开始的练习不能放弃", async () => {
+    const a = addMethodology("方法甲");
+    const practice = await createPractice(
+      { selection: "pick", methodologyId: a, scope: emptyScope, difficulty: "neutral" },
+      { database: test.db },
+    );
+    startSession(practice.sessionId, test.db);
+    expect(() => abandonSession(practice.sessionId, test.db)).toThrowError(ApiError);
+  });
+
+  it("练习不存在返回 404", () => {
+    expect(() => abandonSession(nanoid(), test.db)).toThrowError(ApiError);
   });
 });
 

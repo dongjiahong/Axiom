@@ -8,6 +8,7 @@ import {
   mergeSuggestions,
   methodologies,
   methodologyTags,
+  scenarios,
   sourceChunks,
   sources,
   type MergeSuggestionStatus,
@@ -318,6 +319,26 @@ export function changeMethodologyStatus(
     }
   });
   return getMethodology(id, database);
+}
+
+/**
+ * 永久删除已归档的方法论。出过题的方法论不能删：场景引用它，历史练习和统计要靠它归属，
+ * 只能保持归档。
+ */
+export function deleteMethodology(id: string, database: AppDatabase = db): void {
+  const row = getRow(database, id);
+  if (row.status !== "archived") {
+    throw new ApiError(409, "invalid_state", "只有已归档的方法论可以删除，请先归档");
+  }
+  const practiced = database
+    .select({ count: sql<number>`count(*)` })
+    .from(scenarios)
+    .where(eq(scenarios.targetMethodologyId, id))
+    .get();
+  if ((practiced?.count ?? 0) > 0) {
+    throw new ApiError(409, "invalid_state", "这个方法论已有练习记录，删除会破坏历史与统计，只能保持归档");
+  }
+  database.delete(methodologies).where(eq(methodologies.id, id)).run();
 }
 
 /** 批量迁移状态：逐个执行，失败的收集原因返回，不影响其余成功的方法论。 */

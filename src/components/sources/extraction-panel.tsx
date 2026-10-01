@@ -177,7 +177,7 @@ export function ExtractionPanel({
       ) : null}
 
       {!active && failedCount > 0 ? (
-        <p className="text-sm text-amber-600">{failedCount} 个章节抽取失败，可点击“重试失败章节”。</p>
+        <p className="text-sm text-warning">{failedCount} 个章节抽取失败，可点击“重试失败章节”。</p>
       ) : null}
 
       <Dialog open={confirming} onOpenChange={setConfirming}>

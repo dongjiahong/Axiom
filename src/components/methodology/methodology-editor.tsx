@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
-import { StartPracticeButton } from "@/components/practice/start-practice-button";
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
+import { StartPracticeButton } from "@/components/practice/start-practice-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,11 @@ export function MethodologyEditor({
   const [splitSelected, setSplitSelected] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [mode, setMode] = useState<"view" | "edit">("view");
+  // 有未保存修改时点击站内链接：先暂存目标地址，等用户在对话框里确认。
+  const [leaveHref, setLeaveHref] = useState<string | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const form = useForm<EditorFormValues>({ defaultValues: toForm(initial) });
   const { control, register, reset, getValues, setValue } = form;
@@ -98,10 +104,9 @@ export function MethodologyEditor({
       const anchor = (event.target as HTMLElement).closest("a[href]");
       const href = anchor?.getAttribute("href");
       if (!anchor || !href?.startsWith("/") || anchor.getAttribute("target") === "_blank") return;
-      if (!window.confirm("有未保存的修改，确定离开吗？")) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
+      event.preventDefault();
+      event.stopPropagation();
+      setLeaveHref(href);
     };
     window.addEventListener("beforeunload", beforeUnload);
     document.addEventListener("click", onClick, true);
@@ -122,7 +127,7 @@ export function MethodologyEditor({
   }
 
   function cancelEdit() {
-    if (dirty && !window.confirm("放弃未保存的修改吗？")) return;
+    setConfirmDiscard(false);
     reset(toForm(data));
     setIssues([]);
     setSplitMode(false);
@@ -185,6 +190,17 @@ export function MethodologyEditor({
     );
   }
 
+  async function remove() {
+    setConfirmDelete(false);
+    const done = await run("delete", () =>
+      requestJson<{ id: string }>(`/api/methodologies/${data.id}`, { method: "DELETE" }),
+    );
+    if (!done) return;
+    toast.success("已删除");
+    router.push("/library?status=archived");
+    router.refresh();
+  }
+
   async function split() {
     if (dirty) {
       toast.error("请先保存修改，再拆分");
@@ -225,19 +241,72 @@ export function MethodologyEditor({
         </Button>
       ) : null}
       {data.status !== "archived" ? (
-        <Button type="button" variant="outline" disabled={busy !== null || dirty} onClick={() => void transition("archive")}>
+        <Button type="button" variant="outline" disabled={busy !== null || dirty} onClick={() => setConfirmArchive(true)}>
           归档
         </Button>
       ) : (
-        <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void transition("restore")}>
-          {data.mergedIntoId ? "恢复（撤销合并）" : "恢复"}
-        </Button>
+        <>
+          <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void transition("restore")}>
+            {data.mergedIntoId ? "恢复（撤销合并）" : "恢复"}
+          </Button>
+          <Button type="button" variant="outline" disabled={busy !== null} onClick={() => setConfirmDelete(true)}>
+            删除
+          </Button>
+        </>
       )}
     </>
   );
 
   const excerptDrawer = (
     <ExcerptDrawer excerpt={excerpt} originChunks={data.originChunks} onClose={() => setExcerpt(null)} />
+  );
+
+  const dialogs = (
+    <>
+      <ConfirmDialog
+        open={leaveHref !== null}
+        onOpenChange={(open) => (open ? null : setLeaveHref(null))}
+        title="有未保存的修改"
+        description="现在离开，这些修改会丢失。"
+        confirmLabel="离开"
+        cancelLabel="留在这里"
+        destructive
+        onConfirm={() => {
+          const href = leaveHref;
+          setLeaveHref(null);
+          if (href) router.push(href);
+        }}
+      />
+      <ConfirmDialog
+        open={confirmDiscard}
+        onOpenChange={setConfirmDiscard}
+        title="放弃未保存的修改？"
+        confirmLabel="放弃修改"
+        cancelLabel="继续编辑"
+        destructive
+        onConfirm={cancelEdit}
+      />
+      <ConfirmDialog
+        open={confirmArchive}
+        onOpenChange={setConfirmArchive}
+        title="归档这个方法论？"
+        description="归档后不能用于出题，历史练习和统计不受影响，可以随时恢复。"
+        confirmLabel="归档"
+        onConfirm={() => {
+          setConfirmArchive(false);
+          void transition("archive");
+        }}
+      />
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="永久删除这个方法论？"
+        description="删除后无法恢复。已经出过题的方法论不能删除，需要保留历史练习和统计。"
+        confirmLabel="删除"
+        destructive
+        onConfirm={() => void remove()}
+      />
+    </>
   );
 
   if (mode === "view") {
@@ -259,6 +328,7 @@ export function MethodologyEditor({
           }
         />
         {excerptDrawer}
+        {dialogs}
       </>
     );
   }
@@ -282,7 +352,7 @@ export function MethodologyEditor({
             </Link>
           ) : null}
           {readOnly && data.mergedIntoId ? (
-            <Link href={`/library/${data.mergedIntoId}`} className="text-sm text-amber-600 hover:underline">
+            <Link href={`/library/${data.mergedIntoId}`} className="text-sm text-warning hover:underline">
               已合并到另一个方法论，点击查看
             </Link>
           ) : null}
@@ -359,10 +429,15 @@ export function MethodologyEditor({
               拆分为新方法论（{splitSelected.length}）
             </Button>
           ) : null}
-          <Button type="button" variant="ghost" disabled={busy !== null} onClick={cancelEdit}>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={busy !== null}
+            onClick={() => (dirty ? setConfirmDiscard(true) : cancelEdit())}
+          >
             取消编辑
           </Button>
-          {dirty ? <span className="text-sm text-amber-600">有未保存的修改</span> : null}
+          {dirty ? <span className="text-sm text-warning">有未保存的修改</span> : null}
         </div>
       </div>
 
@@ -447,6 +522,7 @@ export function MethodologyEditor({
       </fieldset>
 
       {excerptDrawer}
+      {dialogs}
     </form>
   );
 }

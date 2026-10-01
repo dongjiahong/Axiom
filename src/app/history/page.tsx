@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { EmptyState } from "@/components/common/empty-state";
+import { LinkTabs } from "@/components/common/link-tabs";
+import { PageHeader } from "@/components/common/page-header";
 import { SessionsTable } from "@/components/history/sessions-table";
 import { Button } from "@/components/ui/button";
 import { HISTORY_PAGE_SIZE } from "@/domain/constants";
@@ -17,21 +20,40 @@ export default async function HistoryPage({ searchParams }: Props) {
   const params = await searchParams;
   const requestedPage = Number.parseInt(first(params.page) ?? "1", 10);
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-  const { items, total } = listSessions({ page });
+  const unfinished = first(params.filter) === "unfinished";
+  const { items, total } = listSessions({ page, unfinished });
   const pageCount = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE));
+
+  const href = (nextPage: number, filter: boolean) => {
+    const search = new URLSearchParams();
+    if (filter) search.set("filter", "unfinished");
+    if (nextPage > 1) search.set("page", String(nextPage));
+    const query = search.toString();
+    return query ? `/history?${query}` : "/history";
+  };
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">历史</h1>
-        <p className="text-muted-foreground text-sm">
-          每一场练习的时间、难度、执行分与说服结果；未结束的可以继续，已复盘的可以查看复盘。
-        </p>
-      </div>
+      <PageHeader
+        title="历史"
+        description="每一场练习的时间、难度、执行分与说服结果；未完成的可以继续，已复盘的可以查看复盘。"
+      />
+
+      <LinkTabs
+        label="历史筛选"
+        items={[
+          { key: "all", label: "全部", href: href(1, false), active: !unfinished },
+          { key: "unfinished", label: "未完成", href: href(1, true), active: unfinished },
+        ]}
+      />
 
       {items.length === 0 ? (
-        <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-          {total === 0 ? (
+        <EmptyState>
+          {total > 0 ? (
+            "这一页没有记录。"
+          ) : unfinished ? (
+            "没有未完成的练习。"
+          ) : (
             <>
               还没有练习记录。先
               <Link href="/practice/new" className="text-foreground mx-1 underline">
@@ -39,10 +61,8 @@ export default async function HistoryPage({ searchParams }: Props) {
               </Link>
               。
             </>
-          ) : (
-            "这一页没有记录。"
           )}
-        </div>
+        </EmptyState>
       ) : (
         <SessionsTable items={items} />
       )}
@@ -55,12 +75,12 @@ export default async function HistoryPage({ searchParams }: Props) {
           <div className="flex gap-2">
             {page > 1 ? (
               <Button size="sm" variant="outline" asChild>
-                <Link href={`/history?page=${page - 1}`}>上一页</Link>
+                <Link href={href(page - 1, unfinished)}>上一页</Link>
               </Button>
             ) : null}
             {page < pageCount ? (
               <Button size="sm" variant="outline" asChild>
-                <Link href={`/history?page=${page + 1}`}>下一页</Link>
+                <Link href={href(page + 1, unfinished)}>下一页</Link>
               </Button>
             ) : null}
           </div>

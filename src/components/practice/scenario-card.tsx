@@ -4,17 +4,19 @@ import type { SessionDto } from "@/server/dto/session";
 
 import { DIFFICULTY_LABELS } from "./labels";
 
-/** 场景卡：只含可见字段（标题、背景、你的角色、你的目标、对方是谁、难度）。 */
-export function ScenarioCard({ session }: { session: SessionDto }) {
+/** 场景卡：只含可见字段（标题、背景、你的角色、你的目标、对方是谁、难度）。页面标题已显示场景名时可隐藏头部。 */
+export function ScenarioCard({ session, showTitle = true }: { session: SessionDto; showTitle?: boolean }) {
   const { scenario } = session;
   return (
     <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-lg">{scenario.title}</CardTitle>
-          <Badge variant="outline">难度：{DIFFICULTY_LABELS[session.difficulty]}</Badge>
-        </div>
-      </CardHeader>
+      {showTitle ? (
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-lg">{scenario.title}</CardTitle>
+            <Badge variant="outline">难度：{DIFFICULTY_LABELS[session.difficulty]}</Badge>
+          </div>
+        </CardHeader>
+      ) : null}
       <CardContent className="space-y-4 text-sm">
         <section className="space-y-1">
           <h3 className="font-medium">背景</h3>

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/common/page-header";
 import { NewPracticeForm } from "@/components/practice/new-practice-form";
 import { listSources } from "@/server/services/sources";
 import { loadConfirmedMethodologies } from "@/server/services/scenarios";
@@ -16,12 +17,10 @@ export default async function NewPracticePage() {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">开始练习</h1>
-        <p className="text-muted-foreground text-sm">
-          设定选题范围与难度后生成场景；对话结束后会评判你做到了哪些要点。
-        </p>
-      </div>
+      <PageHeader
+        title="开始练习"
+        description="设定选题范围与难度后生成场景；对话结束后会评判你做到了哪些要点。"
+      />
       <NewPracticeForm
         methodologies={methodologies}
         tags={listTags().map((tag) => ({ id: tag.id, name: tag.name }))}

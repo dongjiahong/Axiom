@@ -1,6 +1,6 @@
 "use client";
 
-import { Skeleton } from "@/components/practice/briefing-view";
+import { MethodologySkeletonView } from "@/components/practice/methodology-skeleton";
 import { ScenarioCard } from "@/components/practice/scenario-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -122,7 +122,7 @@ export function MethodologySnapshotDialog({
           </DialogDescription>
         </DialogHeader>
         {skeleton ? (
-          <Skeleton skeleton={skeleton} />
+          <MethodologySkeletonView skeleton={skeleton} />
         ) : (
           <p className="text-muted-foreground text-sm">这场练习没有保存方法论快照，无法展示。</p>
         )}

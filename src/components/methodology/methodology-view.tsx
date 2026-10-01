@@ -32,7 +32,7 @@ function StepNumber({ index, conditional }: { index: number; conditional: boolea
     <span
       className={
         conditional
-          ? "bg-background flex size-6 shrink-0 items-center justify-center rounded-full border border-dashed border-amber-500 text-xs font-bold text-amber-600"
+          ? "bg-background flex size-6 shrink-0 items-center justify-center rounded-full border border-dashed border-warning text-xs font-bold text-warning"
           : "bg-foreground text-background flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
       }
     >
@@ -42,7 +42,7 @@ function StepNumber({ index, conditional }: { index: number; conditional: boolea
 }
 
 const ConditionalTag = () => (
-  <Badge variant="outline" className="border-amber-500 text-amber-600">
+  <Badge variant="outline" className="border-warning text-warning">
     条件步骤
   </Badge>
 );
@@ -122,7 +122,7 @@ function StepDetail({
         {step.conditional || step.excerpt || step.inferred ? (
           <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
             {step.conditional ? (
-              <span className="text-sm text-amber-600">触发条件：{step.trigger}</span>
+              <span className="text-sm text-warning">触发条件：{step.trigger}</span>
             ) : null}
             <ExcerptBadge node={step} onOpen={onOpenExcerpt} />
           </div>
@@ -186,7 +186,7 @@ export function MethodologyView({
             </Link>
           ) : null}
           {data.status === "archived" && data.mergedIntoId ? (
-            <Link href={`/library/${data.mergedIntoId}`} className="text-sm text-amber-600 hover:underline">
+            <Link href={`/library/${data.mergedIntoId}`} className="text-sm text-warning hover:underline">
               已合并到另一个方法论，点击查看
             </Link>
           ) : null}
@@ -241,7 +241,7 @@ export function MethodologyView({
                 <span className="text-muted-foreground flex shrink-0 items-start gap-1.5 pt-2 text-xs sm:w-36">
                   <span>{index + 1}.</span>
                   <span className="line-clamp-2">{step.title}</span>
-                  {step.conditional ? <span className="whitespace-nowrap text-amber-600">（条件）</span> : null}
+                  {step.conditional ? <span className="whitespace-nowrap text-warning">（条件）</span> : null}
                 </span>
                 <div className="min-w-0 flex-1 space-y-1.5">
                   {step.exampleLines

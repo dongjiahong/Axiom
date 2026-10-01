@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 import { HISTORY_PAGE_SIZE } from "@/domain/constants";
@@ -370,11 +370,21 @@ export function endSession(
   return getSession(id, database);
 }
 
+/** 放弃还没开始的练习（briefing）：删除会话，场景保留以便重练。 */
+export function abandonSession(id: string, database: AppDatabase = db): { deleted: true } {
+  const session = loadSession(database, id);
+  if (session.status !== "briefing") {
+    throw new ApiError(409, "invalid_state", "练习已经开始，不能放弃；请结束练习");
+  }
+  database.delete(practiceSessions).where(eq(practiceSessions.id, id)).run();
+  return { deleted: true };
+}
+
 // ───────────── 历史与重练 ─────────────
 
-/** 历史列表：按创建时间倒序分页。 */
+/** 历史列表：按创建时间倒序分页；`unfinished` 只列出还没复盘完成的练习。 */
 export function listSessions(
-  query: { page?: number; pageSize?: number } = {},
+  query: { page?: number; pageSize?: number; unfinished?: boolean } = {},
   database: AppDatabase = db,
 ): SessionListDto {
   const page = query.page ?? 1;
@@ -396,6 +406,7 @@ export function listSessions(
     .from(practiceSessions)
     .innerJoin(scenarios, eq(scenarios.id, practiceSessions.scenarioId))
     .leftJoin(debriefs, eq(debriefs.sessionId, practiceSessions.id))
+    .where(query.unfinished ? ne(practiceSessions.status, "debriefed") : undefined)
     .orderBy(desc(practiceSessions.createdAt), desc(practiceSessions.id))
     .all();
 

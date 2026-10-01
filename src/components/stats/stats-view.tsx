@@ -14,17 +14,11 @@ import {
   YAxis,
 } from "recharts";
 
+import { EmptyState } from "@/components/common/empty-state";
 import { DIFFICULTY_LABELS } from "@/components/practice/labels";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Difficulty } from "@/domain/schemas";
 import type { MethodologyOverviewDto, StatsDifficultyDto } from "@/server/dto/stats";
@@ -157,9 +151,9 @@ function OverviewTable({ rows, filtered }: { rows: MethodologyOverviewDto[]; fil
 
   if (rows.length === 0) {
     return (
-      <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+      <EmptyState>
         {filtered ? "当前筛选条件下没有可统计的方法论。" : "方法论库里还没有可统计的方法论。"}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -205,61 +199,61 @@ function OverviewTable({ rows, filtered }: { rows: MethodologyOverviewDto[]; fil
       </ul>
 
       <div className="hidden md:block">
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>方法论</TableHead>
-          <TableHead>标签</TableHead>
-          <TableHead className="text-right">练习场数</TableHead>
-          <TableHead className="text-right">全部均值</TableHead>
-          <TableHead className="text-right">最近 5 场</TableHead>
-          <TableHead className="text-right">看过 / 未看提示</TableHead>
-          <TableHead className="text-right">掌握度</TableHead>
-          <TableHead className="text-right">最近练习</TableHead>
-          <TableHead>趋势</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <Fragment key={row.methodologyId}>
-            <TableRow
-              className="cursor-pointer"
-              onClick={() =>
-                setExpanded((current) => (current === row.methodologyId ? null : row.methodologyId))
-              }
-            >
-              <TableCell className="font-medium">
-                {row.name}
-                {row.status === "archived" ? (
-                  <Badge variant="outline" className="ml-2">
-                    已归档
-                  </Badge>
-                ) : null}
-              </TableCell>
-              <TableCell className="text-muted-foreground">{row.tags.join("、") || "—"}</TableCell>
-              <TableCell className="text-right">{row.practiceCount}</TableCell>
-              <TableCell className="text-right">{formatScore(row.execAvgAll)}</TableCell>
-              <TableCell className="text-right">{formatScore(row.execAvgRecent)}</TableCell>
-              <TableCell className="text-right">
-                {formatScore(row.execAvgWithHint)} / {formatScore(row.execAvgWithoutHint)}
-              </TableCell>
-              <TableCell className="text-right">{formatMastery(row.mastery)}</TableCell>
-              <TableCell className="text-right">{formatDate(row.lastPracticedAt)}</TableCell>
-              <TableCell>
-                <Sparkline points={row.execTrend} />
-              </TableCell>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>方法论</TableHead>
+              <TableHead>标签</TableHead>
+              <TableHead className="text-right">练习场数</TableHead>
+              <TableHead className="text-right">全部均值</TableHead>
+              <TableHead className="text-right">最近 5 场</TableHead>
+              <TableHead className="text-right">看过 / 未看提示</TableHead>
+              <TableHead className="text-right">掌握度</TableHead>
+              <TableHead className="text-right">最近练习</TableHead>
+              <TableHead>趋势</TableHead>
             </TableRow>
-            {expanded === row.methodologyId ? (
-              <TableRow>
-                <TableCell colSpan={8} className="bg-muted/30">
-                  <TrendDetail points={row.execTrend} />
-                </TableCell>
-              </TableRow>
-            ) : null}
-          </Fragment>
-        ))}
-      </TableBody>
-    </Table>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <Fragment key={row.methodologyId}>
+                <TableRow
+                  className="cursor-pointer"
+                  onClick={() =>
+                    setExpanded((current) => (current === row.methodologyId ? null : row.methodologyId))
+                  }
+                >
+                  <TableCell className="font-medium">
+                    {row.name}
+                    {row.status === "archived" ? (
+                      <Badge variant="outline" className="ml-2">
+                        已归档
+                      </Badge>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{row.tags.join("、") || "—"}</TableCell>
+                  <TableCell className="text-right">{row.practiceCount}</TableCell>
+                  <TableCell className="text-right">{formatScore(row.execAvgAll)}</TableCell>
+                  <TableCell className="text-right">{formatScore(row.execAvgRecent)}</TableCell>
+                  <TableCell className="text-right">
+                    {formatScore(row.execAvgWithHint)} / {formatScore(row.execAvgWithoutHint)}
+                  </TableCell>
+                  <TableCell className="text-right">{formatMastery(row.mastery)}</TableCell>
+                  <TableCell className="text-right">{formatDate(row.lastPracticedAt)}</TableCell>
+                  <TableCell>
+                    <Sparkline points={row.execTrend} />
+                  </TableCell>
+                </TableRow>
+                {expanded === row.methodologyId ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="bg-muted/30">
+                      <TrendDetail points={row.execTrend} />
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+              </Fragment>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </>
   );
@@ -293,7 +287,7 @@ function TrendDetail({ points }: { points: TrendPoint[] }) {
           </span>
         ))}
         <span className="text-muted-foreground flex items-center gap-1">
-          <span className="inline-block size-2.5 rounded-full border-2 bg-white" />
+          <span className="inline-block size-2.5 rounded-full border-2 bg-background" />
           空心表示查看过提示
         </span>
       </div>
@@ -316,7 +310,28 @@ function DifficultyView({ data }: { data: StatsDifficultyDto }) {
           ) : (
             <DifficultyBars difficulty={data} />
           )}
-          <Table>
+          <ul className="space-y-2 md:hidden">
+            {DIFFICULTY_ORDER.map((key) => {
+              const bucket = data.overall[key];
+              return (
+                <li key={key} className="space-y-1 rounded-lg border p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{DIFFICULTY_LABELS[key]}</span>
+                    <span className="text-muted-foreground text-xs">{bucket.n} 场</span>
+                  </div>
+                  <p className="text-xs">
+                    执行分均值 <b className="tabular-nums">{formatScore(bucket.execAvg)}</b>
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    {OUTCOME_ORDER.map(
+                      (outcome) => `${OUTCOME_SHORT_LABELS[outcome]} ${bucket.outcomeDistribution[outcome]}`,
+                    ).join(" · ")}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+          <Table className="hidden md:table">
             <TableHeader>
               <TableRow>
                 <TableHead>难度</TableHead>
@@ -358,48 +373,76 @@ function DifficultyView({ data }: { data: StatsDifficultyDto }) {
           {data.byMethodology.length === 0 ? (
             <p className="text-muted-foreground text-sm">还没有可统计的方法论。</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>方法论</TableHead>
-                  {DIFFICULTY_ORDER.map((key) => (
-                    <TableHead key={key} className="text-right">
-                      {DIFFICULTY_LABELS[key]}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.byMethodology.map((row) => {
-                  const highlighted = data.largestGap?.methodologyId === row.methodologyId;
-                  return (
-                    <TableRow key={row.methodologyId} className={highlighted ? "bg-amber-50" : undefined}>
-                      <TableCell className="font-medium">
-                        {row.name}
-                        {row.status === "archived" ? (
-                          <Badge variant="outline" className="ml-2">
-                            已归档
-                          </Badge>
-                        ) : null}
-                        {highlighted ? (
-                          <Badge variant="secondary" className="ml-2">
-                            高低档差 {data.largestGap?.gap}
-                          </Badge>
-                        ) : null}
-                      </TableCell>
+            <>
+              <ul className="space-y-2 md:hidden">
+                {data.byMethodology.map((row) => (
+                  <li key={row.methodologyId} className="space-y-1 rounded-lg border p-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{row.name}</span>
+                      {row.status === "archived" ? <Badge variant="outline">已归档</Badge> : null}
+                      {data.largestGap?.methodologyId === row.methodologyId ? (
+                        <Badge variant="secondary">高低档差 {data.largestGap?.gap}</Badge>
+                      ) : null}
+                    </div>
+                    <dl className="grid grid-cols-3 gap-2 text-xs">
                       {DIFFICULTY_ORDER.map((key) => {
                         const bucket = row.byDifficulty[key];
                         return (
-                          <TableCell key={key} className="text-right">
-                            {bucket === null ? "—" : `${bucket.execAvg}（${bucket.n}）`}
-                          </TableCell>
+                          <div key={key}>
+                            <dt className="text-muted-foreground">{DIFFICULTY_LABELS[key]}</dt>
+                            <dd className="tabular-nums">
+                              {bucket === null ? "—" : `${bucket.execAvg}（${bucket.n}）`}
+                            </dd>
+                          </div>
                         );
                       })}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                    </dl>
+                  </li>
+                ))}
+              </ul>
+              <Table className="hidden md:table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>方法论</TableHead>
+                    {DIFFICULTY_ORDER.map((key) => (
+                      <TableHead key={key} className="text-right">
+                        {DIFFICULTY_LABELS[key]}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.byMethodology.map((row) => {
+                    const highlighted = data.largestGap?.methodologyId === row.methodologyId;
+                    return (
+                      <TableRow key={row.methodologyId} className={highlighted ? "bg-warning/10" : undefined}>
+                        <TableCell className="font-medium">
+                          {row.name}
+                          {row.status === "archived" ? (
+                            <Badge variant="outline" className="ml-2">
+                              已归档
+                            </Badge>
+                          ) : null}
+                          {highlighted ? (
+                            <Badge variant="secondary" className="ml-2">
+                              高低档差 {data.largestGap?.gap}
+                            </Badge>
+                          ) : null}
+                        </TableCell>
+                        {DIFFICULTY_ORDER.map((key) => {
+                          const bucket = row.byDifficulty[key];
+                          return (
+                            <TableCell key={key} className="text-right">
+                              {bucket === null ? "—" : `${bucket.execAvg}（${bucket.n}）`}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </>
           )}
         </CardContent>
       </Card>

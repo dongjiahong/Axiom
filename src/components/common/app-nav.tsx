@@ -11,14 +11,21 @@ import {
   Play,
   Settings,
 } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+const NEW_PRACTICE_HREF = "/practice/new";
+
+/** 练习页（/practice/<id>）归在「历史」下；新建练习有自己的主按钮。 */
+const isSessionPath = (pathname: string) =>
+  pathname.startsWith("/practice/") && pathname !== NEW_PRACTICE_HREF;
 
 const NAV_ITEMS = [
   { href: "/", label: "首页", icon: House },
   { href: "/sources", label: "资料", icon: BookOpen },
   { href: "/library", label: "方法论库", icon: Library },
-  { href: "/practice/new", label: "开始练习", icon: Play },
-  { href: "/history", label: "历史", icon: History },
+  { href: "/history", label: "历史", icon: History, also: isSessionPath },
   { href: "/stats", label: "统计", icon: ChartColumn },
   { href: "/settings", label: "设置", icon: Settings },
 ];
@@ -28,11 +35,19 @@ export function AppNav({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav className="flex flex-col gap-1 p-3">
+      <Button asChild className="mb-2 w-full" variant={pathname === NEW_PRACTICE_HREF ? "secondary" : "default"}>
+        <Link href={NEW_PRACTICE_HREF} onClick={onNavigate}>
+          <Play />
+          开始练习
+        </Link>
+      </Button>
       {NAV_ITEMS.map((item) => {
         const active =
           item.href === "/"
             ? pathname === "/"
-            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+            : pathname === item.href ||
+              pathname.startsWith(`${item.href}/`) ||
+              (item.also?.(pathname) ?? false);
         const Icon = item.icon;
 
         return (

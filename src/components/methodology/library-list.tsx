@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
+import { EmptyState } from "@/components/common/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,7 +28,7 @@ const ACTION_LABELS: Record<StatusAction, string> = {
   restore: "恢复为候选",
 };
 
-type Busy = "merge" | "create" | StatusAction | null;
+type Busy = "merge" | "create" | "delete" | StatusAction | null;
 
 interface Props {
   items: MethodologyListItemDto[];
@@ -39,6 +41,8 @@ export function LibraryList({ items, status, filtered, totalInStatus }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState<Busy>(null);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // 列表刷新后已选条目可能已不在当前标签页，按当前列表过滤一遍。
   const selectedIds = items.map((item) => item.id).filter((id) => selected.includes(id));
@@ -81,6 +85,7 @@ export function LibraryList({ items, status, filtered, totalInStatus }: Props) {
   }
 
   async function runBulk(action: StatusAction) {
+    setConfirmArchive(false);
     setBusy(action);
     try {
       const result = await requestJson<BulkStatusResultDto>("/api/methodologies/bulk-status", {
@@ -112,15 +117,41 @@ export function LibraryList({ items, status, filtered, totalInStatus }: Props) {
     }
   }
 
+  async function runDelete() {
+    setConfirmDelete(false);
+    setBusy("delete");
+    const failed: { id: string; message: string }[] = [];
+    let deleted = 0;
+    for (const id of selectedIds) {
+      try {
+        await requestJson(`/api/methodologies/${id}`, { method: "DELETE" });
+        deleted += 1;
+      } catch (err) {
+        failed.push({ id, message: err instanceof Error ? err.message : "删除失败" });
+      }
+    }
+    if (failed.length === 0) {
+      toast.success(`已删除 ${deleted} 个方法论`);
+      setSelected([]);
+    } else {
+      const details = failed.slice(0, 3).map((failure) => `「${nameOf(failure.id)}」${failure.message}`);
+      toast.error(
+        `已删除 ${deleted} 个，${failed.length} 个未删除：${details.join("；")}${failed.length > 3 ? " 等" : ""}`,
+      );
+      setSelected(failed.map((failure) => failure.id));
+    }
+    router.refresh();
+    setBusy(null);
+  }
+
   const actionButton = (action: StatusAction, variant: "secondary" | "outline") => (
     <Button
+      size="sm"
       variant={variant}
-      disabled={selectedIds.length === 0 || busy !== null}
-      onClick={() => void runBulk(action)}
+      disabled={busy !== null}
+      onClick={() => (action === "archive" ? setConfirmArchive(true) : void runBulk(action))}
     >
-      {busy === action
-        ? `正在${ACTION_LABELS[action]}……`
-        : `${ACTION_LABELS[action]}${selectedIds.length > 0 ? `（${selectedIds.length}）` : ""}`}
+      {busy === action ? `正在${ACTION_LABELS[action]}……` : `${ACTION_LABELS[action]}（${selectedIds.length}）`}
     </Button>
   );
 
@@ -148,28 +179,30 @@ export function LibraryList({ items, status, filtered, totalInStatus }: Props) {
             已选 {selectedIds.length} / {items.length} 项
           </span>
         </div>
-        <Button onClick={() => void create()} disabled={busy !== null}>
+        <Button size="sm" onClick={() => void create()} disabled={busy !== null}>
           新建方法论
         </Button>
       </div>
 
-      {items.length === 0 ? null : (
-        <div className="flex flex-wrap items-center gap-2">
+      {selectedIds.length === 0 ? null : (
+        // 选中后固定在窗口底部，长列表里滚动时操作也不会离开视野
+        <div className="bg-background sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center gap-2 border-t px-4 py-2 md:-mx-6 md:px-6">
           {status === "draft" ? actionButton("confirm", "secondary") : null}
           {status === "confirmed" ? actionButton("unconfirm", "outline") : null}
           {status === "archived" ? actionButton("restore", "secondary") : null}
           {status !== "archived" ? actionButton("archive", "outline") : null}
-          {status === "draft" ? (
-            <Button
-              variant="outline"
-              disabled={selectedIds.length < 2 || busy !== null}
-              onClick={() => void merge()}
-            >
-              {busy === "merge" ? "正在合并……" : `合并所选${selectedIds.length >= 2 ? `（${selectedIds.length}）` : ""}`}
+          {status === "archived" ? (
+            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setConfirmDelete(true)}>
+              {busy === "delete" ? "正在删除……" : `删除（${selectedIds.length}）`}
+            </Button>
+          ) : null}
+          {status === "draft" && selectedIds.length >= 2 ? (
+            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void merge()}>
+              {busy === "merge" ? "正在合并……" : `合并所选（${selectedIds.length}）`}
             </Button>
           ) : null}
           {selectedIds.length === 2 ? (
-            <Button variant="ghost" asChild>
+            <Button size="sm" variant="ghost" asChild>
               <Link href={`/library/compare?a=${selectedIds[0]}&b=${selectedIds[1]}`}>对比所选</Link>
             </Button>
           ) : null}
@@ -177,7 +210,7 @@ export function LibraryList({ items, status, filtered, totalInStatus }: Props) {
       )}
 
       {items.length === 0 ? (
-        <EmptyState status={status} filtered={filtered} totalInStatus={totalInStatus} />
+        <EmptyHint status={status} filtered={filtered} totalInStatus={totalInStatus} />
       ) : (
         <ul className="divide-y rounded-lg border">
           {items.map((item) => (
@@ -210,7 +243,7 @@ export function LibraryList({ items, status, filtered, totalInStatus }: Props) {
                   {item.status === "confirmed" ? <span>版本 {item.version}</span> : null}
                   {item.inferredCount > 0 ? <span>{item.inferredCount} 处 AI 推断</span> : null}
                   {item.unmatchedExcerptCount > 0 ? (
-                    <span className="text-amber-600">{item.unmatchedExcerptCount} 处摘录未匹配</span>
+                    <span className="text-warning">{item.unmatchedExcerptCount} 处摘录未匹配</span>
                   ) : null}
                 </div>
               </div>
@@ -218,11 +251,29 @@ export function LibraryList({ items, status, filtered, totalInStatus }: Props) {
           ))}
         </ul>
       )}
+
+      <ConfirmDialog
+        open={confirmArchive}
+        onOpenChange={setConfirmArchive}
+        title={`归档所选的 ${selectedIds.length} 个方法论？`}
+        description="归档后不能用于出题，历史练习和统计不受影响，可以随时恢复。"
+        confirmLabel="归档"
+        onConfirm={() => void runBulk("archive")}
+      />
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={`永久删除所选的 ${selectedIds.length} 个方法论？`}
+        description="删除后无法恢复。已经出过题的方法论不能删除，会保留在归档里。"
+        confirmLabel="删除"
+        destructive
+        onConfirm={() => void runDelete()}
+      />
     </div>
   );
 }
 
-function EmptyState({
+function EmptyHint({
   status,
   filtered,
   totalInStatus,
@@ -245,13 +296,16 @@ function EmptyState({
     text = "没有已归档的方法论。";
   }
   return (
-    <div className="text-muted-foreground space-y-3 rounded-lg border border-dashed p-8 text-center text-sm">
-      <p>{text}</p>
-      {action ? (
-        <Button variant="outline" asChild>
-          <Link href={action.href}>{action.label}</Link>
-        </Button>
-      ) : null}
-    </div>
+    <EmptyState
+      action={
+        action ? (
+          <Button variant="outline" asChild>
+            <Link href={action.href}>{action.label}</Link>
+          </Button>
+        ) : null
+      }
+    >
+      {text}
+    </EmptyState>
   );
 }

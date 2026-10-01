@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/common/page-header";
 import { StatsFilters } from "@/components/stats/stats-filters";
 import { StatsView } from "@/components/stats/stats-view";
 import { listSources } from "@/server/services/sources";
@@ -23,12 +24,7 @@ export default async function StatsPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">统计</h1>
-        <p className="text-muted-foreground text-sm">
-          只统计已复盘的练习，分数用改判后重算的执行分。
-        </p>
-      </div>
+      <PageHeader title="统计" description="只统计已复盘的练习，分数用改判后重算的执行分。" />
 
       <StatsFilters
         tagId={filter.tagId}

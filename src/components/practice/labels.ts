@@ -29,6 +29,17 @@ export const SCENARIO_LOADING_MESSAGES = [
   "最后通读一遍，看合不合理……",
 ];
 
+/** 复盘期间遮罩里轮播的阶段文案（同样不代表真实进度）。 */
+export const DEBRIEF_LOADING_MESSAGES = [
+  "正在通读整段对话……",
+  "逐条核对要点有没有做到……",
+  "找出你原话里的证据……",
+  "检查有没有违反原则……",
+  "斟酌哪里还能说得更好……",
+  "编写示范改写……",
+  "汇总这一场的表现……",
+];
+
 export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
   briefing: "准备中",
   active: "进行中",
