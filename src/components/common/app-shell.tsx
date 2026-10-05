@@ -21,14 +21,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="bg-sidebar hidden h-screen w-52 shrink-0 overflow-y-auto border-r md:sticky md:top-0 md:block">
+      <aside className="bg-sidebar hidden h-screen w-56 shrink-0 overflow-y-auto border-r md:sticky md:top-0 md:block">
         <div className="flex h-14 items-center px-4">
           <Logo />
         </div>
         <AppNav />
       </aside>
 
-      <header className="bg-background sticky top-0 z-40 flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
+      <header className="bg-sidebar sticky top-0 z-40 flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="打开导航菜单">

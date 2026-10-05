@@ -44,8 +44,8 @@ export function ExcerptBadge({
           excerpt.match === "none"
             ? "border-warning text-warning"
             : excerpt.match === "exact"
-              ? "border-emerald-500 text-emerald-600"
-              : "border-sky-500 text-sky-600"
+              ? "border-success text-success"
+              : "border-brand-ink text-brand-ink"
         }
       >
         {label}
@@ -111,7 +111,7 @@ export function ExcerptDrawer({
               {start >= 0 && hit ? (
                 <>
                   {data.text.slice(0, start)}
-                  <mark ref={markRef} className="rounded bg-yellow-200 px-0.5 dark:bg-yellow-700/60">
+                  <mark ref={markRef} className="rounded bg-brand/40 px-0.5">
                     {hit.text}
                   </mark>
                   {data.text.slice(start + hit.text.length)}

@@ -241,7 +241,7 @@ export function DebriefView({ initial }: { initial: DebriefDto }) {
                   </CardContent>
                 </Card>
               ) : (
-                <details key={step.id} className="rounded-lg border p-3 text-sm">
+                <details key={step.id} className="bg-card rounded-xl border p-3 text-sm">
                   <summary className="cursor-pointer">
                     {index + 1}. {step.title}
                     <span className="text-muted-foreground ml-2">本场未触发（{step.trigger}）</span>
@@ -356,7 +356,7 @@ function Conversation({
   }, [active]);
 
   return (
-    <div ref={container} className={`${className} space-y-3 overflow-y-auto rounded-lg border p-3`}>
+    <div ref={container} className={`${className} space-y-3 overflow-y-auto bg-card rounded-xl border p-3`}>
       {dto.session.messages.map((m) => {
         const isUser = m.role === "user";
         const highlighted = isUser && active?.turn === m.turn;
@@ -369,14 +369,14 @@ function Conversation({
               </div>
               <div
                 data-user-turn={isUser ? m.turn : undefined}
-                className={`rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
-                  isUser ? "bg-primary text-primary-foreground" : "bg-muted"
-                } ${highlighted ? "ring-2 ring-amber-400" : ""}`}
+                className={`rounded-xl px-3.5 py-2.5 text-sm whitespace-pre-wrap ${
+                  isUser ? "bg-brand-soft text-foreground" : "bg-muted"
+                } ${highlighted ? "ring-2 ring-brand" : ""}`}
               >
                 {at >= 0 && active ? (
                   <>
                     {m.content.slice(0, at)}
-                    <mark className="rounded bg-amber-300 px-0.5 text-black">{active.quote}</mark>
+                    <mark className="bg-brand text-foreground rounded px-0.5">{active.quote}</mark>
                     {m.content.slice(at + active.quote.length)}
                   </>
                 ) : (
@@ -418,7 +418,7 @@ function VerdictCard({
             {VERDICT_LABELS[effective]}
           </span>
           {verdict.effectiveQuality !== null ? (
-            <span className="text-amber-500" title={`质量分 ${verdict.effectiveQuality}`}>
+            <span className="text-brand-ink" title={`质量分 ${verdict.effectiveQuality}`}>
               {stars(verdict.effectiveQuality)}
             </span>
           ) : null}
@@ -472,7 +472,7 @@ function VerdictCard({
       {verdict.suggestion ? <p className="text-muted-foreground">建议：{verdict.suggestion}</p> : null}
 
       {verdict.rewrite ? (
-        <div className="space-y-1 rounded border-l-2 border-emerald-400 bg-emerald-50/50 p-2">
+        <div className="bg-success/8 space-y-1 rounded-lg p-3">
           <div>
             <span className="text-muted-foreground text-xs">你当时说（第 {verdict.rewrite.turn} 轮）</span>
             <p>{verdict.rewrite.original || "（这一要点没有对应的原话）"}</p>

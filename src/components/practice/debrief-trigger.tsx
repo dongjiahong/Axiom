@@ -46,7 +46,7 @@ export function DebriefTrigger({ sessionId, auto }: { sessionId: string; auto: b
     );
   }
   return (
-    <div className="space-y-2 rounded-lg border p-6 text-sm">
+    <div className="space-y-2 bg-card rounded-xl border p-6 text-sm">
       {error ? <p className="text-destructive">复盘失败：{error}</p> : <p>练习已结束，可以开始复盘。</p>}
       <Button onClick={() => void run()}>{state === "failed" ? "重试复盘" : "开始复盘"}</Button>
     </div>

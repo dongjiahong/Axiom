@@ -16,8 +16,8 @@ export function MessageBubble({
           {isUser ? "你" : counterpartName}
         </div>
         <div
-          className={`rounded-lg px-3 py-2 text-sm break-words whitespace-pre-wrap ${
-            isUser ? "bg-primary text-primary-foreground" : "bg-muted"
+          className={`rounded-xl px-3.5 py-2.5 text-sm break-words whitespace-pre-wrap ${
+            isUser ? "bg-brand-soft text-foreground" : "bg-muted"
           }`}
         >
           {message.content}

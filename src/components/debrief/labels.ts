@@ -12,11 +12,11 @@ export const VERDICT_LABELS: Record<KeyPointVerdictValue | PrincipleVerdictValue
 };
 
 export const VERDICT_STYLES: Record<KeyPointVerdictValue | PrincipleVerdictValue, string> = {
-  done: "bg-emerald-100 text-emerald-800",
-  kept: "bg-emerald-100 text-emerald-800",
-  partial: "bg-amber-100 text-amber-800",
-  missed: "bg-red-100 text-red-800",
-  violated: "bg-red-100 text-red-800",
+  done: "bg-success/12 text-success",
+  kept: "bg-success/12 text-success",
+  partial: "bg-warning/15 text-warning",
+  missed: "bg-destructive/10 text-destructive",
+  violated: "bg-destructive/10 text-destructive",
   not_triggered: "bg-muted text-muted-foreground",
 };
 

@@ -34,10 +34,7 @@ export default async function HistoryPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="历史"
-        description="每一场练习的时间、难度、执行分与说服结果；未完成的可以继续，已复盘的可以查看复盘。"
-      />
+      <PageHeader title="历史" />
 
       <LinkTabs
         label="历史筛选"

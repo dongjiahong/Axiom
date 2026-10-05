@@ -100,7 +100,7 @@ export function SourcesList({ initial }: { initial: SourceListItemDto[] }) {
       {initial.length === 0 ? (
         <EmptyState>还没有资料，先上传一本书或一段文字稿。</EmptyState>
       ) : (
-        <ul className="divide-y rounded-lg border">
+        <ul className="divide-y bg-card rounded-xl border">
           {initial.map((source) => (
             <li key={source.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1 space-y-1">

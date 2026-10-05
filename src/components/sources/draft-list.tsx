@@ -16,7 +16,7 @@ export function DraftList({ drafts }: { drafts: SourceDraftDto[] }) {
     return <p className="text-muted-foreground text-sm">还没有候选方法论。完成抽取后会显示在这里。</p>;
   }
   return (
-    <ul className="divide-y rounded-lg border">
+    <ul className="divide-y bg-card rounded-xl border">
       {drafts.map((draft) => (
         <li key={draft.id} className="flex flex-wrap items-center gap-2 px-4 py-3">
           <Link href={`/library/${draft.id}`} className="font-medium hover:underline">

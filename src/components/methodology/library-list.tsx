@@ -18,7 +18,7 @@ import type {
 } from "@/server/dto/methodology";
 import type { StatusAction } from "@/server/services/methodologies";
 
-import { CREATED_BY_LABELS, requestJson, STATUS_LABELS } from "./labels";
+import { CREATED_BY_LABELS, requestJson } from "./labels";
 
 /** 批量状态迁移时的按钮文案。 */
 const ACTION_LABELS: Record<StatusAction, string> = {
@@ -212,7 +212,7 @@ export function LibraryList({ items, status, filtered, totalInStatus }: Props) {
       {items.length === 0 ? (
         <EmptyHint status={status} filtered={filtered} totalInStatus={totalInStatus} />
       ) : (
-        <ul className="divide-y rounded-lg border">
+        <ul className="bg-card divide-y rounded-xl border">
           {items.map((item) => (
             <li key={item.id} className="flex items-start gap-3 px-4 py-3">
               <Checkbox
@@ -226,9 +226,6 @@ export function LibraryList({ items, status, filtered, totalInStatus }: Props) {
                   <Link href={`/library/${item.id}`} className="font-medium hover:underline">
                     {item.name || "（未命名）"}
                   </Link>
-                  <Badge variant={item.status === "confirmed" ? "default" : "outline"}>
-                    {STATUS_LABELS[item.status]}
-                  </Badge>
                   {item.tags.map((tag) => (
                     <Badge key={tag} variant="secondary">
                       {tag}
@@ -240,7 +237,6 @@ export function LibraryList({ items, status, filtered, totalInStatus }: Props) {
                   <span>
                     来源：{item.sourceTitle ?? (item.sourceId ? "资料" : CREATED_BY_LABELS[item.createdBy])}
                   </span>
-                  {item.status === "confirmed" ? <span>版本 {item.version}</span> : null}
                   {item.inferredCount > 0 ? <span>{item.inferredCount} 处 AI 推断</span> : null}
                   {item.unmatchedExcerptCount > 0 ? (
                     <span className="text-warning">{item.unmatchedExcerptCount} 处摘录未匹配</span>

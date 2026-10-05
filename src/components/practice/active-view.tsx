@@ -133,10 +133,10 @@ export function ActiveView({ session }: { session: SessionDto }) {
         </div>
       </div>
 
-      <div className="rounded-lg border">
+      <div className="bg-card rounded-xl border">
         <button
           type="button"
-          className="hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm"
+          className="hover:bg-accent/50 flex w-full items-center gap-2 rounded-xl px-4 py-2.5 text-left text-sm"
           aria-expanded={showScenario}
           onClick={() => setShowScenario((v) => !v)}
         >
@@ -152,7 +152,7 @@ export function ActiveView({ session }: { session: SessionDto }) {
 
       {showScenario ? <ScenarioCard session={session} showTitle={false} /> : null}
 
-      <div className="space-y-3 rounded-lg border p-4 md:max-h-[55vh] md:overflow-y-auto">
+      <div className="bg-card space-y-3 rounded-xl border p-4 md:max-h-[55vh] md:min-h-[40vh] md:overflow-y-auto">
         {messages.length === 0 ? (
           <p className="text-muted-foreground text-sm">对方在等你先开口。</p>
         ) : null}

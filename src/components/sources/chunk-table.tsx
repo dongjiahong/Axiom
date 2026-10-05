@@ -157,7 +157,7 @@ export function ChunkTable({
     <>
       {toolbar}
 
-      <ul className="divide-y rounded-lg border md:hidden">
+      <ul className="divide-y bg-card rounded-xl border md:hidden">
         {chunks.map((chunk) => (
           <li key={chunk.id} className="space-y-2 p-3 text-sm">
             <div className="font-medium">

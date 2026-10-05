@@ -13,8 +13,10 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="设置" description="配置 AI 模型端点与练习轮数上限。" />
-      <SettingsForm initial={settings} dataDir={dataDir} />
+      <PageHeader title="设置" />
+      <div className="max-w-3xl">
+        <SettingsForm initial={settings} dataDir={dataDir} />
+      </div>
     </div>
   );
 }

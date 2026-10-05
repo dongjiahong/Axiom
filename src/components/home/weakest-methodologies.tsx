@@ -24,7 +24,7 @@ export function WeakestMethodologies({ items }: { items: WeakestMethodologyDto[]
           确认入库。
         </EmptyState>
       ) : (
-        <ul className="divide-y rounded-lg border">
+        <ul className="divide-y bg-card rounded-xl border">
           {items.map((item) => (
             <li key={item.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1 space-y-1">
@@ -42,7 +42,7 @@ export function WeakestMethodologies({ items }: { items: WeakestMethodologyDto[]
                   掌握度 {formatMastery(item.mastery)} · 最近练习 {formatDate(item.lastPracticedAt)}
                 </p>
               </div>
-              <StartPracticeButton methodologyId={item.id} label="练习" size="sm" />
+              <StartPracticeButton methodologyId={item.id} label="练习" size="sm" variant="outline" />
             </li>
           ))}
         </ul>

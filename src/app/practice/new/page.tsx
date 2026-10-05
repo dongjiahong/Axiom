@@ -17,15 +17,14 @@ export default async function NewPracticePage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="开始练习"
-        description="设定选题范围与难度后生成场景；对话结束后会评判你做到了哪些要点。"
-      />
-      <NewPracticeForm
-        methodologies={methodologies}
-        tags={listTags().map((tag) => ({ id: tag.id, name: tag.name }))}
-        sources={sources}
-      />
+      <PageHeader title="开始练习" />
+      <div className="max-w-3xl">
+        <NewPracticeForm
+          methodologies={methodologies}
+          tags={listTags().map((tag) => ({ id: tag.id, name: tag.name }))}
+          sources={sources}
+        />
+      </div>
     </div>
   );
 }

@@ -233,7 +233,7 @@ function StepCard({
   });
 
   return (
-    <div id={fid(path)} className="space-y-3 rounded-lg border p-4">
+    <div id={fid(path)} className="space-y-3 bg-card rounded-xl border p-4">
       <div className="flex flex-wrap items-center gap-2">
         {splitMode ? (
           <Checkbox
@@ -396,7 +396,7 @@ export function ConceptsSection({
         <p className="text-muted-foreground text-sm">支撑方法论的原理或术语，只用于复盘时讲解，不单独评判。</p>
       </div>
       {fields.map((field, index) => (
-        <div key={field[KEY]} className="space-y-2 rounded-lg border p-4">
+        <div key={field[KEY]} className="space-y-2 bg-card rounded-xl border p-4">
           <div className="flex items-center gap-2">
             <Input
               id={fid(`concepts[${index}].name`)}

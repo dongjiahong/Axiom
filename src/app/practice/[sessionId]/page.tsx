@@ -39,7 +39,9 @@ export default async function PracticePage({ params }: Props) {
         }
       />
       {session.status === "briefing" ? (
-        <BriefingView session={session} />
+        <div className="max-w-3xl">
+          <BriefingView session={session} />
+        </div>
       ) : session.status === "active" ? (
         <ActiveView session={session} />
       ) : (

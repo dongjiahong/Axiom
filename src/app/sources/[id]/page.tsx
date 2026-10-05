@@ -68,7 +68,7 @@ export default async function SourceDetailPage({ params }: Props) {
 
       <div className="space-y-2">
         <h2 className="text-lg font-medium">章节块</h2>
-        <div className="rounded-lg border">
+        <div className="bg-card rounded-xl border">
           <ChunkTable sourceId={detail.id} chunks={detail.chunks} />
         </div>
       </div>

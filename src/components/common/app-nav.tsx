@@ -35,7 +35,7 @@ export function AppNav({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav className="flex flex-col gap-1 p-3">
-      <Button asChild className="mb-2 w-full" variant={pathname === NEW_PRACTICE_HREF ? "secondary" : "default"}>
+      <Button asChild className="mb-3 w-full" variant={pathname === NEW_PRACTICE_HREF ? "outline" : "default"}>
         <Link href={NEW_PRACTICE_HREF} onClick={onNavigate}>
           <Play />
           开始练习
@@ -57,13 +57,13 @@ export function AppNav({ onNavigate }: { onNavigate?: () => void }) {
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+              "flex h-9 items-center gap-2.5 rounded-lg px-3 text-sm transition-colors",
               active
-                ? "bg-secondary text-secondary-foreground font-medium"
-                : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
+                ? "bg-sidebar-accent text-sidebar-accent-foreground ring-sidebar-border font-medium ring-1"
+                : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
             )}
           >
-            <Icon className="size-4" />
+            <Icon className={cn("size-4", active && "text-brand-ink")} />
             {item.label}
           </Link>
         );

@@ -30,5 +30,14 @@ export function formatCharCount(count: number): string {
 }
 
 export function formatDateTime(ms: number): string {
-  return new Date(ms).toLocaleString("zh-CN", { hour12: false });
+  const date = new Date(ms);
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleString("zh-CN", {
+    year: sameYear ? undefined : "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }

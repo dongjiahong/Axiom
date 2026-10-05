@@ -44,10 +44,7 @@ export default async function LibraryPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="方法论库"
-        description="审阅从资料中抽取的候选方法论，确认后进入方法论库，成为出题的唯一来源。"
-      />
+      <PageHeader title="方法论库" />
 
       <LinkTabs
         label="方法论状态"

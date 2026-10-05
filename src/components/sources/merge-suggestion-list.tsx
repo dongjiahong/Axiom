@@ -33,7 +33,7 @@ export function MergeSuggestionList({ suggestions }: { suggestions: MergeSuggest
   }
 
   return (
-    <ul className="divide-y rounded-lg border">
+    <ul className="divide-y bg-card rounded-xl border">
       {suggestions.map((suggestion) => {
         const working = busy?.id === suggestion.id;
         return (

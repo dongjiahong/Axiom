@@ -24,18 +24,18 @@ export default function HomePage() {
   return (
     <div className="space-y-6">
       {isLLMConfigured() ? null : <LLMNotConfiguredBanner />}
-      <PageHeader title="首页" description="继续或开始练习、查看最需要练习的方法论与最近的练习记录。" />
+      <PageHeader title="首页" />
 
       <section>
-        <Card>
+        <Card className={unfinished ? "bg-brand-soft ring-brand/40" : undefined}>
           <CardContent className="flex flex-wrap items-center justify-between gap-3">
             {unfinished ? (
               <>
                 <div className="min-w-0 space-y-1">
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-brand-ink text-xs font-medium">
                     有一场练习还没完成 · {SESSION_STATUS_LABELS[unfinished.status]}
                   </p>
-                  <p className="font-medium">{unfinished.scenarioTitle}</p>
+                  <p className="text-lg font-medium">{unfinished.scenarioTitle}</p>
                   <p className="text-muted-foreground text-xs">方法论：{unfinished.methodologyName}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -50,7 +50,7 @@ export default function HomePage() {
             ) : (
               <>
                 <div className="space-y-1">
-                  <p className="font-medium">开始一场练习</p>
+                  <p className="text-lg font-medium">开始一场练习</p>
                   <p className="text-muted-foreground text-sm">
                     选一个方法论或随机抽取，AI 扮演对方和你对话，结束后评判你做到了哪些要点。
                   </p>

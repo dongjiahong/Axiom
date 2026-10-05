@@ -318,7 +318,12 @@ export function MethodologyEditor({
           actions={
             <div className="flex flex-wrap items-center gap-2">
               {!readOnly ? (
-                <Button type="button" disabled={busy !== null} onClick={() => setMode("edit")}>
+                <Button
+                  type="button"
+                  variant={data.status === "confirmed" ? "outline" : "default"}
+                  disabled={busy !== null}
+                  onClick={() => setMode("edit")}
+                >
                   编辑
                 </Button>
               ) : null}
@@ -343,7 +348,7 @@ export function MethodologyEditor({
     >
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={data.status === "confirmed" ? "default" : "outline"}>{STATUS_LABELS[data.status]}</Badge>
+          <Badge variant={data.status === "confirmed" ? "brand" : "outline"}>{STATUS_LABELS[data.status]}</Badge>
           {data.status === "confirmed" ? <Badge variant="secondary">版本 {data.version}</Badge> : null}
           <Badge variant="outline">{CREATED_BY_LABELS[data.createdBy]}</Badge>
           {data.sourceId ? (

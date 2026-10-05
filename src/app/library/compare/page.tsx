@@ -78,7 +78,7 @@ function Section({ title, items }: { title: string; items: React.ReactNode[] }) 
 function Column({ methodology }: { methodology: MethodologyDetailDto }) {
   const { body } = methodology;
   return (
-    <div className="space-y-4 rounded-lg border p-4">
+    <div className="space-y-4 bg-card rounded-xl border p-4">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Link href={`/library/${methodology.id}`} className="text-lg font-medium hover:underline">

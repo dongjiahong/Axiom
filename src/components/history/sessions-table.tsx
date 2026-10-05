@@ -42,7 +42,7 @@ function SessionCards({ items }: { items: SessionListItemDto[] }) {
   return (
     <ul className="space-y-3 md:hidden">
       {items.map((item) => (
-        <li key={item.id} className="space-y-2 rounded-lg border p-3 text-sm">
+        <li key={item.id} className="space-y-2 bg-card rounded-xl border p-3 text-sm">
           <div className="flex items-start justify-between gap-2">
             <Link href={sessionHref(item)} className="font-medium hover:underline">
               {item.scenarioTitle}
@@ -74,7 +74,7 @@ function SessionCards({ items }: { items: SessionListItemDto[] }) {
 
 function SessionsDesktopTable({ items }: { items: SessionListItemDto[] }) {
   return (
-    <div className="hidden rounded-lg border md:block">
+    <div className="hidden bg-card rounded-xl border md:block">
       <Table>
         <TableHeader>
           <TableRow>
@@ -129,7 +129,7 @@ function SessionsDesktopTable({ items }: { items: SessionListItemDto[] }) {
 /** 首页「最近练习」：紧凑列表。 */
 export function RecentSessions({ items }: { items: SessionListItemDto[] }) {
   return (
-    <ul className="divide-y rounded-lg border">
+    <ul className="divide-y bg-card rounded-xl border">
       {items.map((item) => (
         <li key={item.id} className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
           <Link href={sessionHref(item)} className="min-w-0 basis-full truncate font-medium hover:underline sm:flex-1 sm:basis-0">

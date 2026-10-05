@@ -49,7 +49,7 @@ const ConditionalTag = () => (
 
 /** 示例话术的引用条。 */
 const Quote = ({ children }: { children: ReactNode }) => (
-  <p className="rounded-r-md border-l-2 border-sky-500 bg-sky-50 px-3 py-2 text-sm text-sky-950 dark:bg-sky-950/30 dark:text-sky-100">
+  <p className="bg-brand-soft rounded-lg px-3 py-2 text-sm">
     {children}
   </p>
 );
@@ -78,8 +78,8 @@ function ItemCard({
 }) {
   const ok = tone === "ok";
   return (
-    <div className={ok ? "space-y-2 rounded-xl bg-emerald-50 p-4 dark:bg-emerald-950/30" : "space-y-2 rounded-xl bg-red-50 p-4 dark:bg-red-950/30"}>
-      <h3 className={ok ? "text-sm font-semibold text-emerald-700 dark:text-emerald-400" : "text-sm font-semibold text-red-700 dark:text-red-400"}>
+    <div className={ok ? "bg-success/8 space-y-2 rounded-xl p-4" : "bg-destructive/8 space-y-2 rounded-xl p-4"}>
+      <h3 className={ok ? "text-success text-sm font-semibold" : "text-destructive text-sm font-semibold"}>
         {ok ? "✓" : "✗"} {title}
       </h3>
       {items.length === 0 ? (
@@ -108,7 +108,7 @@ function StepDetail({
   onOpenExcerpt: OpenExcerpt;
 }) {
   return (
-    <details className="group rounded-lg border" open={index === 0}>
+    <details className="group bg-card rounded-xl border" open={index === 0}>
       <summary className="hover:bg-muted/50 group-open:bg-muted/40 flex cursor-pointer list-none items-center gap-2.5 rounded-lg px-4 py-3 [&::-webkit-details-marker]:hidden">
         <StepNumber index={index} conditional={step.conditional} />
         <span className="font-semibold">{step.title}</span>
@@ -143,7 +143,7 @@ function StepDetail({
           {step.commonMistakes.length === 0 ? (
             <Empty />
           ) : (
-            <ul className="list-disc space-y-1.5 pl-5 text-sm text-red-700 dark:text-red-400">
+            <ul className="list-disc space-y-1.5 pl-5 text-sm text-destructive">
               {step.commonMistakes.map((mistake, i) => (
                 <li key={i}>{mistake}</li>
               ))}
@@ -177,7 +177,7 @@ export function MethodologyView({
     <div className="space-y-9">
       <header className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={data.status === "confirmed" ? "default" : "outline"}>{STATUS_LABELS[data.status]}</Badge>
+          <Badge variant={data.status === "confirmed" ? "brand" : "outline"}>{STATUS_LABELS[data.status]}</Badge>
           {data.status === "confirmed" ? <Badge variant="secondary">版本 {data.version}</Badge> : null}
           <Badge variant="outline">{CREATED_BY_LABELS[data.createdBy]}</Badge>
           {data.sourceId ? (
@@ -296,8 +296,8 @@ export function MethodologyView({
                   variant="outline"
                   className={
                     principle.kind === "do"
-                      ? "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
-                      : "border-transparent bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-400"
+                      ? "bg-success/12 text-success border-transparent"
+                      : "bg-destructive/10 text-destructive border-transparent"
                   }
                 >
                   {principle.kind === "do" ? "要做" : "禁忌"}

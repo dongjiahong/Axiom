@@ -163,7 +163,7 @@ function OverviewTable({ rows, filtered }: { rows: MethodologyOverviewDto[]; fil
     <>
       <ul className="space-y-3 md:hidden">
         {rows.map((row) => (
-          <li key={row.methodologyId} className="rounded-lg border text-sm">
+          <li key={row.methodologyId} className="bg-card rounded-xl border text-sm">
             <button
               type="button"
               className="w-full space-y-2 p-3 text-left"
@@ -222,7 +222,7 @@ function OverviewTable({ rows, filtered }: { rows: MethodologyOverviewDto[]; fil
                     setExpanded((current) => (current === row.methodologyId ? null : row.methodologyId))
                   }
                 >
-                  <TableCell className="font-medium">
+                  <TableCell className="min-w-44 font-medium whitespace-normal">
                     {row.name}
                     {row.status === "archived" ? (
                       <Badge variant="outline" className="ml-2">
@@ -314,7 +314,7 @@ function DifficultyView({ data }: { data: StatsDifficultyDto }) {
             {DIFFICULTY_ORDER.map((key) => {
               const bucket = data.overall[key];
               return (
-                <li key={key} className="space-y-1 rounded-lg border p-3 text-sm">
+                <li key={key} className="space-y-1 bg-card rounded-xl border p-3 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{DIFFICULTY_LABELS[key]}</span>
                     <span className="text-muted-foreground text-xs">{bucket.n} 场</span>
@@ -376,7 +376,7 @@ function DifficultyView({ data }: { data: StatsDifficultyDto }) {
             <>
               <ul className="space-y-2 md:hidden">
                 {data.byMethodology.map((row) => (
-                  <li key={row.methodologyId} className="space-y-1 rounded-lg border p-3 text-sm">
+                  <li key={row.methodologyId} className="space-y-1 bg-card rounded-xl border p-3 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{row.name}</span>
                       {row.status === "archived" ? <Badge variant="outline">已归档</Badge> : null}
