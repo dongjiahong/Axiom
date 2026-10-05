@@ -49,7 +49,7 @@ const ConditionalTag = () => (
 
 /** 示例话术的引用条。 */
 const Quote = ({ children }: { children: ReactNode }) => (
-  <p className="bg-brand-soft rounded-lg px-3 py-2 text-sm">
+  <p className="bg-muted rounded-lg px-3 py-2 text-sm">
     {children}
   </p>
 );
